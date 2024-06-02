@@ -1,0 +1,9 @@
+{
+    "name": "Taiwan Real-time Earthquake Monitoring",
+    "render_readme": true,
+    "domain": "trem",
+    "documentation": "https://github.com/J1A-T13N/ha-trem",
+    "issue_tracker": "https://github.com/J1A-T13N/ha-trem/issues",
+    "homeassistant": "2024.6.0",
+    "//_homeassistant": " Requirement Python 3.11"
+}
