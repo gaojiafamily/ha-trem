@@ -14,10 +14,11 @@
 [![Project Maintenance][maintenance2-shield]][user2_profile]
 <hr>
 
-English | [繁體中文](README_zhHant.md)<br>
+
+[English](README.md) | 繁體中文<br>
 
 
-## Screenshots
+## 預覽
 
 ![image](https://github.com/J1A-T13N/ha-trem/assets/29163857/620d2723-1d77-4ead-a203-6d0d612031fd)
 
@@ -25,105 +26,104 @@ English | [繁體中文](README_zhHant.md)<br>
 <br>
 
 
-## Available
+## 測試結果
 
-| Environment | Home Assistant OS[^1] | Home Assistant Core | Home Assistant Supervisor |
+| 環境 | Home Assistant OS[^1] | Home Assistant Core | Home Assistant Supervisor |
 | :------------: | :------------: | :------------: | :------------: |
 | Virtual Machine[^2] | :heavy_check_mark: |  |  |
 | Container |  | :heavy_check_mark: | :question:[^3] |
 | Virtual Environment |  | :heavy_check_mark: |  |
 | Physics Machine[^4] | :question:[^5] | :heavy_minus_sign:[^6] | :question:[^3] |
 
-:heavy_check_mark: Available<br>
-:heavy_multiplication_x: Unavailable<br>
-:question: Untested<br>
-:heavy_minus_sign: See footnotes<br>
-[^1]: /tmp is mounted noexec on HAOS so it can't compile, A [workaround](https://github.com/home-assistant/core/issues/118717) is to do this inside the container.
-[^2]: Virtual Machine may include but not limited to: VirtualBox、Unraid、KVM/Proxmox、UTM...etc.
-[^3]: If your installation method is [it](https://github.com/home-assistant/supervised-installer).
-[^4]: Physics Machine may include but not limited to: Raspberry Pi、Home Assistant Green、Home Assistant Yellow...etc.
-[^5]: So far, only known raspberry pi 4 is available.
-[^6]: If your installation method on other systems, Hope you can provide feedback.
+:heavy_check_mark: 測試通過<br>
+:heavy_multiplication_x: 無法安裝<br>
+:question: 尚未測試<br>
+:heavy_minus_sign: 請看備註<br>
+[^1]: Home Assistant OS 暫存(tmp)目錄被掛載 noexec 導致無法編譯, 您可以透過此 [解決辦法](https://github.com/home-assistant/core/issues/118717) 在容器內安裝所需套件。
+[^2]: 虛擬機包括但不限: VirtualBox、Unraid、KVM/Proxmox、UTM...等。
+[^3]: 如果您是按照[該方式](https://github.com/home-assistant/supervised-installer)安裝。
+[^4]: 實體機包括但不限: Raspberry Pi、Home Assistant Green、Home Assistant Yellow...等。
+[^5]: 到目前為止, 僅 Raspberry Pi 4 通過測試。
+[^6]: 如果你有其他安裝環境, 可以協助測試並提供回饋。
 
 <hr>
 <br>
 
 
-## Installation
+## 安裝方式
 
-### Using [HACS](https://hacs.xyz/) (recommended)
+### 透過 [HACS](https://hacs.xyz/) (推薦)
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=J1A-T13N&repository=ha-trem&category=Integration)
 
-### Manual
-1. Create `config/custom_components` folder if not existing.
-2. Copy `trem` into `custom_components` folder.
+### 手動安裝
+1. 如果 `config/custom_components` 不存在，請建立該資料夾
+2. 複製 `trem` 到 `custom_components` 資料夾內
 
 <hr>
 <br>
 
 
-## Config
-Configure your name and region, in `config/configuration.yaml`.
+## 設定
+於 `config/configuration.yaml` 中，設定name(顯示名稱)及region(示警地區)。
 ```yaml
 sensor:
   - platform: trem
-    name: Company # Display name
-    region: 116 # Region Code (Zip Code)
+    name: Company # 顯示名稱
+    region: 116 # 示警地區
   - platform: trem
-    name: Sweet Home # Display name
-    region: 231 # Region Code (Zip Code)
+    name: Sweet Home # 顯示名稱
+    region: 231 # 示警地區
 ```
-**:zap: Remember restart Home Assistant. :zap:**
+**:zap: 請記得重啟 Home Assistant. :zap:**
 
-*An example of `configuration.yaml` can be found [here](configuration.yaml).*<br>
-*Region Code can be found [here](https://github.com/ExpTechTW/TREM-tauri/blob/main/src/assets/json/region.json).*
+*`configuration.yaml` 示範檔案可[在此處](configuration.yaml)查看。*<br>
+*示警地區代號可[在此處](https://github.com/ExpTechTW/TREM-tauri/blob/main/src/assets/json/region.json)查詢。*
 <hr>
 <br>
 
 
-## Known issues
+## 已知問題
 
-1. HAOS unable to install dependencies is fix, See [here](docs/haos_guide.md)
-2. Unable to reload entries in service (homeassistant.reload_config_entry).
-
-<hr>
-<br>
-
-
-## Contribution
-
-- ExpTech Studio `HTTP API`
-- watermelon1024 `Python Function`
-- kukuxx `Test Partner`
-
-<p>I would like to thank everyone who has helped me and every partner in the community for their generous help.</p>
+1. 無法安裝必要套件問題已解決, 請查看[指南](docs/haos_guide.md)安裝。
+2. 無法透過服務(homeassistant.reload_config_entry)重新載入。
 
 <hr>
 <br>
 
 
-## Future
+## 貢獻者
 
-- [ ] HomeAssistant Features: Integration loading its platforms from its own set up.
-- [ ] HomeAssistant Features: Earthquake early warning by tracker device or person.
-- [ ] HomeAssistant Service: Earthquake Simulator.
-- [ ] HomeAssistant Service: Earthquake Sensor reload.
-- [ ] ExptechTW Features: Earthquake early warning Source from WebSocket.
-- [ ] ExptechTW Features: Exptech Subscribe (Ex: TREM-Net Earthquake early warning listener).
+- ExpTech Studio 探索科技 `示警資料`
+- watermelon1024 `計算程式`
+- kukuxx `解決辦法提供者`
+
+<p>在此感謝每一位幫助過我，及社群上的每一位夥伴，不吝給予協助。</p>
+<hr>
+<br>
+
+
+## 未來功能
+
+- [ ] HomeAssistant: 採用平台集合提供更多服務 (例如：等震圖繪製)。
+- [ ] HomeAssistant: 地震速報以使用者或自訂定位，計算震度及抵達時間。
+- [ ] HomeAssistant: 模擬地震服務 (用於測試自動化)。
+- [ ] HomeAssistant: 透過服務(homeassistant.reload_config_entry)重新載入。
+- [ ] ExptechTW 訂閱功能: 使用WebSocket作為地震速報來源，減少流量及延遲。
+- [ ] ExptechTW 訂閱功能: 更多訂閱方案 (例如: TREM-Net地震速報網)。
 
 <hr>
 <br>
 
 
 > [!IMPORTANT]
->The source of earthquake early warning is provided by ExpTech Studio and is for reference only.<br>
->The actual results are subject to the content published by [CWA](https://scweb.cwa.gov.tw/en-US).
+>示警資料來源由 ExpTech Studio 提供，僅供參考，<br>
+>實際結果依 [中央氣象局](https://scweb.cwa.gov.tw/en-US) 公佈之內容為準。
 
 <hr>
 <br>
 
 
-## Donate
+## 贊助
 
 | Buy me a coffee | LINE Bank | JKao Pay |
 | :------------: | :------------: | :------------: |
@@ -133,7 +133,7 @@ sensor:
 <br>
 
 
-## License
+## 授權
 AGPL-3.0 license
 
 

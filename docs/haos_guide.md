@@ -1,4 +1,4 @@
-## Fix the problem that the geopandas package cannot be installed
+## Fix the problem that the dependencies cannot be installed
 
 ### SSH Add-on (Recommended)
 1. Go to the Add-on store<br>
@@ -13,17 +13,20 @@ login
 docker exec -it homeassistant bash
 ```
 ![image](https://github.com/J1A-T13N/ha-trem/assets/29163857/36748f45-03c1-4f3e-814e-cd54167606b7)
-7. Copy and paste into the Terminal to install the geopandas package
+7. Copy and paste into the Terminal to install the dependencies
 ```bash
 apk add --no-cache e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++
 fallocate -l 1G /usr/tmp-disk
 mkfs.ext4 /usr/tmp-disk
 mount -o loop -t ext4 /usr/tmp-disk /tmp
-pip install geopandas==0.14.4 matplotlib==3.9.0
+pip --no-cache-dir install geopandas==0.14.4 matplotlib==3.9.0
 ```
 ![image](https://github.com/J1A-T13N/ha-trem/assets/29163857/b207f304-65bd-4ed2-aefb-60caf51f412c)
 8. If everything is successfully, [Continue configuration the integration](../README.md#config).
 
+> [!NOTE]
+> Excessive memory use when install Matplotlib [^1], A [workaround](https://stackoverflow.com/questions/29466663/memory-error-while-using-pip-install-matplotlib) is to run pip with `--no-cache-dir` to avoid the cache.
+[^1]: This error is coming up because, it seems, pip's caching mechanism is trying to read the entire file into memory before caching it… which poses a problem in a limited-memory environment, as matplotlib is ~50mb.
 <hr>
 <br>
 
@@ -31,39 +34,18 @@ pip install geopandas==0.14.4 matplotlib==3.9.0
 ### Docker Terminal
 1. Open a terminal and login
 2. Go inside the container with docker exec -it homeassistant bash (or similar)
-3. Copy and paste into the Terminal.
+3. Copy and paste into the Terminal to install the dependencies
 ```bash
 apk add --no-cache e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++
 fallocate -l 1G /usr/tmp-disk
 mkfs.ext4 /usr/tmp-disk
 mount -o loop -t ext4 /usr/tmp-disk /tmp
-pip install geopandas==0.14.4 matplotlib==3.9.0
+pip --no-cache-dir install geopandas==0.14.4 matplotlib==3.9.0
 ```
 4. If everything is successfully, [Continue configuration the integration](../README.md#config).
 
+> [!NOTE]
+> Excessive memory use when install Matplotlib [^1], A [workaround](https://stackoverflow.com/questions/29466663/memory-error-while-using-pip-install-matplotlib) is to run pip with `--no-cache-dir` to avoid the cache.
+[^1]: This error is coming up because, it seems, pip's caching mechanism is trying to read the entire file into memory before caching it… which poses a problem in a limited-memory environment, as matplotlib is ~50mb.
 <hr>
 <br>
-  
-
-### Service (Not recommended)
-1. Add the following to your configuration.yaml file:
-```yaml
-shell_command:
-  extlib_install: >
-    apk add --no-cache e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++
-  trem_install: >
-    pip install geopandas==0.14.4 matplotlib==3.9.0
-```
-2. Restart Home Assistant.
-3. Go to Developer tools > Service in the sidebar
-4. Click [GO TO YAML MODE], Copy and paste into the text box.
-```yaml
-service: shell_command.extlib_install
-```
-5. Click [CALL SERVICE] and wait for the response extension library to be installed success.
-6. Copy and paste into the text box.
-```yaml
-service: shell_command.trem_install
-```
-7. Click [CALL SERVICE] and wait for the response required library to be installed success.
-8. If everything is successfully, [Continue configuration the integration](../README.md#config).
