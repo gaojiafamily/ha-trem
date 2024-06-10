@@ -1,5 +1,14 @@
 ## Fix the problem that the dependencies cannot be installed
 
+> [!IMPORTANT]
+> This custom component installation is considered advanced<br>
+> should only be used if one is an expert in managing a Linux operating system.
+
+> [!IMPORTANT]
+> Minimum system requirements your device must meet to install dependencies: <br>
+> RAM: 4GB, If your device has less than 4GB of memory, A memory error may have occurred.
+> Storage: 64 GB or larger storage device.
+
 ### SSH Add-on (Recommended)
 1. Go to the Add-on store<br>
 [![Open this add-on in your Home Assistant instance.](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_ssh&repository_url=https%3A%2F%2Fgithub.com%2Fhassio-addons%2Frepository)
@@ -15,12 +24,16 @@ docker exec -it homeassistant bash
 ![image](https://github.com/J1A-T13N/ha-trem/assets/29163857/36748f45-03c1-4f3e-814e-cd54167606b7)
 7. Copy and paste into the Terminal to install the dependencies
 ```bash
-apk add --no-cache e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++
-fallocate -l 1G /usr/tmp-disk
+apk add e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++ # Required dependencies
+apk add gfortran openblas-dev linux-headers # If you're download v0.0.2, Required this dependencies
+fallocate -l 4G /usr/tmp-disk
 mkfs.ext4 /usr/tmp-disk
 mount -o loop -t ext4 /usr/tmp-disk /tmp
-pip --no-cache-dir install geopandas==0.14.4 matplotlib==3.9.0
+pip install --no-cache-dir geopandas==0.14.4 matplotlib==3.9.0 # Required dependencies
+pip install --no-binary :all: scipy==1.12.0 # If you're download v0.0.2, Required this dependencies
+pip install obspy==1.4.0 # If you're download v0.0.2, Required this dependencies
 ```
+
 ![image](https://github.com/J1A-T13N/ha-trem/assets/29163857/b207f304-65bd-4ed2-aefb-60caf51f412c)
 8. If everything is successfully, [Continue configuration the integration](../README.md#config).
 
@@ -36,12 +49,16 @@ pip --no-cache-dir install geopandas==0.14.4 matplotlib==3.9.0
 2. Go inside the container with docker exec -it homeassistant bash (or similar)
 3. Copy and paste into the Terminal to install the dependencies
 ```bash
-apk add --no-cache e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++
-fallocate -l 1G /usr/tmp-disk
+apk add e2fsprogs musl-dev gdal-dev proj-dev proj-util gcc g++ # Required dependencies
+apk add gfortran openblas-dev linux-headers # If you're download v0.0.2, Required this dependencies
+fallocate -l 4G /usr/tmp-disk
 mkfs.ext4 /usr/tmp-disk
 mount -o loop -t ext4 /usr/tmp-disk /tmp
-pip --no-cache-dir install geopandas==0.14.4 matplotlib==3.9.0
+pip install --no-cache-dir geopandas==0.14.4 matplotlib==3.9.0 # Required dependencies
+pip install --no-binary :all: scipy==1.12.0 # If you're download v0.0.2, Required this dependencies
+pip install obspy==1.4.0 # If you're download v0.0.2, Required this dependencies
 ```
+
 4. If everything is successfully, [Continue configuration the integration](../README.md#config).
 
 > [!NOTE]

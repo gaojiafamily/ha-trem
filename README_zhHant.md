@@ -17,6 +17,10 @@
 
 [English](README.md) | 繁體中文<br>
 
+> [!IMPORTANT]
+> 這個自訂元件安裝方法較為困難<br>
+> 適合管理 Linux 系統專家才能安裝
+
 
 ## 預覽
 
@@ -68,12 +72,18 @@
 ```yaml
 sensor:
   - platform: trem
-    name: Company # 顯示名稱
+    friendly_name: Company # 顯示名稱
     region: 116 # 示警地區
   - platform: trem
-    name: Sweet Home # 顯示名稱
+    friendly_name: Sweet Home # 顯示名稱
     region: 231 # 示警地區
+    keep_alive: True # 保留示警記錄
 ```
+> [!TIP]
+> 此configuration適用v0.0.2以上版本<br>
+> Release v0.0.1 請將`friendly_name`改回`name`。
+<br>
+
 **:zap: 請記得重啟 Home Assistant. :zap:**
 
 *`configuration.yaml` 示範檔案可[在此處](configuration.yaml)查看。*<br>

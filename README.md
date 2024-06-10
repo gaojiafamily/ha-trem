@@ -16,6 +16,10 @@
 
 English | [繁體中文](README_zhHant.md)<br>
 
+> [!IMPORTANT]
+> This custom component installation is considered advanced<br>
+> should only be used if one is an expert in managing a Linux operating system.
+
 
 ## Screenshots
 
@@ -67,12 +71,18 @@ Configure your name and region, in `config/configuration.yaml`.
 ```yaml
 sensor:
   - platform: trem
-    name: Company # Display name
+    friendly_name: Company # Display name
     region: 116 # Region Code (Zip Code)
   - platform: trem
-    name: Sweet Home # Display name
+    friendly_name: Sweet Home # Display name
+    keep_alive: True
     region: 231 # Region Code (Zip Code)
 ```
+> [!TIP]
+> This configuration is suitable for v0.0.2 and above versions<br>
+> Release v0.0.1 Please change friendly_name back to name.
+<br>
+
 **:zap: Remember restart Home Assistant. :zap:**
 
 *An example of `configuration.yaml` can be found [here](configuration.yaml).*<br>
