@@ -17,7 +17,7 @@ ISSUE_URL = f"{PROJECT_URL}issues"
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.0.3"
+__version__ = "1.0.5"
 
 # General sensor attributes
 ATTRIBUTION = "Powered by ExpTech Studio"
@@ -34,7 +34,7 @@ ATTR_INT = "intensity"
 ATTR_EST = "estimate"
 ATTR_NODE = "API_Node"
 ATTR_EQDATA = "earthquake_data"
-ATTR_LIST = [
+EARTHQUAKE_ATTR = [
     ATTR_ID,
     ATTR_AUTHOR,
     ATTR_LNG,
@@ -45,6 +45,10 @@ ATTR_LIST = [
     ATTR_TIME,
     ATTR_INT,
     ATTR_EST,
+]
+TSUNAMI_ATTR = [
+    ATTR_ID,
+    ATTR_AUTHOR,
 ]
 MANUFACTURER = "ExptechTW"
 
