@@ -30,14 +30,15 @@ from .const import (
     CLIENT_NAME,
     CONF_DRAW_MAP,
     CONF_PRESERVE_DATA,
-    DEFAULT_ICON,
     DEFAULT_NAME,
     DOMAIN,
     EARTHQUAKE_ATTR,
     MANUFACTURER,
+    MONITOR_ICON,
     TREM_COORDINATOR,
     TREM_NAME,
     TSUNAMI_ATTR,
+    TSUNAMI_ICON,
 )
 from .earthquake.eew import EEW, EarthquakeData
 from .earthquake.location import REGIONS
@@ -235,7 +236,7 @@ class earthquakeSensor(SensorEntity):
     def icon(self) -> str:
         """Icon to use in the frontend, if any."""
 
-        return DEFAULT_ICON
+        return MONITOR_ICON
 
     @property
     def unit_of_measurement(self):
@@ -362,7 +363,7 @@ class tsunamiSensor(SensorEntity):
     def icon(self) -> str:
         """Icon to use in the frontend, if any."""
 
-        return DEFAULT_ICON
+        return TSUNAMI_ICON
 
     @property
     def unit_of_measurement(self):

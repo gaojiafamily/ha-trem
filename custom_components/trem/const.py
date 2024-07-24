@@ -4,7 +4,8 @@ from datetime import timedelta
 
 # Initialize
 DEFAULT_NAME = "TREM"
-DEFAULT_ICON = "mdi:chart-timeline-variant"
+MONITOR_ICON = "mdi:chart-timeline-variant"
+TSUNAMI_ICON = "mdi:tsunami"
 DOMAIN = "trem"
 PLATFORMS = ["image", "sensor"]
 
