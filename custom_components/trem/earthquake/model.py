@@ -1,12 +1,12 @@
-"""
-Earthquake expected data calculator.
+"""Earthquake expected data calculator.
 
 Reference: https://github.com/ExpTechTW/TREM-tauri/blob/main/src/scripts/helper/utils.ts
 """
 
-import math
+from collections import OrderedDict
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, OrderedDict
+import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 from obspy.taup import tau
@@ -41,7 +41,9 @@ class WaveModel:
     Represents a P and S waves model.
     """
 
-    def __init__(self, distance: np.ndarray, p_time: np.ndarray, s_time: np.ndarray) -> None:
+    def __init__(
+        self, distance: np.ndarray, p_time: np.ndarray, s_time: np.ndarray
+    ) -> None:
         """
         Initialize the travel time model.
         Note: You should not create this class directly, instead, use the :method:`get_wave_model` method.
@@ -126,8 +128,8 @@ def get_wave_model(depth: float) -> WaveModel:
 
 
 # pre fill wave model cache
-for depth in range(10, 101, 10):
-    get_wave_model(depth)
+for _depth in range(10, 101, 10):
+    get_wave_model(_depth)
 
 
 class Intensity:
@@ -174,7 +176,14 @@ class Distance:
     Represents a distance and travel time.
     """
 
-    __slots__ = ("_km", "_deg", "_p_arrival_time", "_s_arrival_time", "_p_travel_time", "_s_travel_time")
+    __slots__ = (
+        "_km",
+        "_deg",
+        "_p_arrival_time",
+        "_s_arrival_time",
+        "_p_travel_time",
+        "_s_travel_time",
+    )
 
     def __init__(
         self,
@@ -268,7 +277,9 @@ class RegionExpectedIntensity:
     Represents a region expected intensity.
     """
 
-    def __init__(self, region: RegionLocation, intensity: Intensity, distance: Distance) -> None:
+    def __init__(
+        self, region: RegionLocation, intensity: Intensity, distance: Distance
+    ) -> None:
         """
         Initialize the region expected intensity instance.
 
@@ -349,9 +360,11 @@ def _calculate_distance(p1: Location, p2: Location) -> float:
     dlon = lon2 - lon1
     dlat = lat2 - lat1
 
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return c
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    return 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def round_intensity(intensity: float) -> int:
@@ -399,7 +412,12 @@ def _calculate_intensity(
     :return: Estimated intensity.
     :rtype: float
     """
-    pga = 1.657 * math.exp(1.533 * magnitude) * hypocenter_distance**-1.607 * (site_effect or 1.751)
+    pga = (
+        1.657
+        * math.exp(1.533 * magnitude)
+        * hypocenter_distance**-1.607
+        * (site_effect or 1.751)
+    )
     i = 2 * math.log10(pga) + 0.7
 
     if i > 3:
@@ -440,7 +458,9 @@ def calculate_expected_intensity_and_travel_time(
     for region in regions or REGIONS.values():
         distance_in_radians = _calculate_distance(earthquake, region)
         distance_in_degrees = math.degrees(distance_in_radians)
-        real_distance_in_km = math.sqrt((distance_in_radians * EARTH_RADIUS) ** 2 + squared_depth)
+        real_distance_in_km = math.sqrt(
+            (distance_in_radians * EARTH_RADIUS) ** 2 + squared_depth
+        )
         intensity = _calculate_intensity(
             real_distance_in_km, earthquake.mag, earthquake.depth, region.side_effect
         )
@@ -459,6 +479,4 @@ def calculate_expected_intensity_and_travel_time(
             ),
         )
 
-    intensities = RegionExpectedIntensities(_expected_intensity)
-
-    return intensities
+    return RegionExpectedIntensities(_expected_intensity)

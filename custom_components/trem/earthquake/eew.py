@@ -1,3 +1,5 @@
+"""Earthquake expected data."""
+
 import asyncio
 from datetime import datetime
 
@@ -132,20 +134,6 @@ class EarthquakeData:
         return self._model
 
     @property
-    def expected_intensity(self) -> dict[int, RegionExpectedIntensity]:
-        """
-        The expected intensity of the earthquake (if have been calculated).
-        """
-        return self._expected_intensity
-
-    @property
-    def city_max_intensity(self) -> dict[str, RegionExpectedIntensity]:
-        """
-        The maximum intensity of the earthquake in each city (if have been calculated).
-        """
-        return self._city_max_intensity
-
-    @property
     def map(self) -> Map:
         """
         The intensity map object of the earthquake (if have been calculated).
@@ -163,7 +151,9 @@ class EarthquakeData:
         :rtype: EarthquakeData
         """
         return cls(
-            location=EarthquakeLocation(data["lon"], data["lat"], data.get("loc", MISSING)),
+            location=EarthquakeLocation(
+                data["lon"], data["lat"], data.get("loc", MISSING)
+            ),
             magnitude=data["mag"],
             depth=data["depth"],
             time=datetime.fromtimestamp(data["time"] / 1000),
@@ -190,26 +180,6 @@ class EarthquakeData:
             )
         }
         return self._expected_intensity
-
-    def calc_all_data(self):
-        try:
-            self.calc_expected_intensity()
-            self.map.draw()
-        except asyncio.CancelledError:
-            self._map._drawn = False
-            pass
-        except Exception:
-            self._calc_task.cancel()
-        finally:
-            pass
-
-    def calc_all_data_in_executor(self, loop: asyncio.AbstractEventLoop):
-        if self._calc_task is None:
-            self._calc_task = loop.run_in_executor(None, self.calc_all_data)
-        return self._calc_task
-
-    async def wait_until_intensity_calculated(self):
-        await self._calc_task
 
 
 class Provider:

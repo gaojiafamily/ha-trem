@@ -1,4 +1,7 @@
-import os, json
+"""Earthquake expected location."""
+
+import json
+import os
 from typing import Union
 
 import geopandas as gpd

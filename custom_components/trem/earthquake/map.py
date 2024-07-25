@@ -1,10 +1,13 @@
-import os, io
+"""Earthquake isoseismal map draw."""
+
+import io
+import os
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
-    from earthquake.eew import EarthquakeData
+    from .eew import EarthquakeData
 
 import warnings
 

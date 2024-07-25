@@ -18,7 +18,7 @@ ISSUE_URL = f"{PROJECT_URL}issues"
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 # General sensor attributes
 ATTRIBUTION = "Powered by ExpTech Studio"
