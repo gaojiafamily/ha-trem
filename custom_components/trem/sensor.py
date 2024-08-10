@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 import logging
+import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
@@ -15,6 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
     ATTR_AUTHOR,
+    ATTR_CODE,
     ATTR_DEPTH,
     ATTR_EST,
     ATTR_ID,
@@ -31,6 +33,7 @@ from .const import (
     DEFAULT_ICON,
     DEFAULT_NAME,
     DOMAIN,
+    DPIP_COORDINATOR,
     EARTHQUAKE_ATTR,
     EARTHQUAKE_ICON,
     MANUFACTURER,
@@ -41,7 +44,7 @@ from .const import (
 )
 from .earthquake.eew import EEW, EarthquakeData
 from .earthquake.location import REGIONS
-from .trem_update_coordinator import tremUpdateCoordinator
+from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,23 +52,30 @@ SCAN_INTERVAL = timedelta(seconds=1)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, config: ConfigEntry, async_add_devices: Callable
+    hass: HomeAssistant, config_entry: ConfigEntry, async_add_devices: Callable
 ) -> None:
     """Set up the TREM sensor from config."""
 
-    domain_data: dict = hass.data[DOMAIN][config.entry_id]
+    domain_data: dict = hass.data[DOMAIN][config_entry.entry_id]
     name: str = domain_data[TREM_NAME]
     coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
 
-    earthquake_device = earthquakeSensor(hass, name, config, coordinator)
-    not_membership = _get_config_value(config, CONF_EMAIL, False) is False
+    if DPIP_COORDINATOR in domain_data:
+        dpipCoordinator: dpipUpdateCoordinator = domain_data[DPIP_COORDINATOR]
+        earthquake_device = earthquakeSensor(
+            hass, name, config_entry, coordinator, dpipCoordinator
+        )
+    else:
+        earthquake_device = earthquakeSensor(hass, name, config_entry, coordinator)
+
+    not_membership = _get_config_value(config_entry, CONF_EMAIL, False) is False
     if not_membership:
         async_add_devices(
             [earthquake_device],
             update_before_add=True,
         )
     else:
-        tsunami_device = tsunamiSensor(hass, name, config, coordinator)
+        tsunami_device = tsunamiSensor(hass, name, config_entry, coordinator)
         async_add_devices(
             [
                 earthquake_device,
@@ -82,26 +92,36 @@ class earthquakeSensor(SensorEntity):
         self,
         hass: HomeAssistant,
         name: str,
-        config: ConfigEntry,
+        config_entry: ConfigEntry,
         coordinator: tremUpdateCoordinator,
+        dpipCoordinator: dpipUpdateCoordinator | None = None,
     ) -> None:
         """Initialize the sensor."""
 
         self._coordinator = coordinator
+        self._dpip = dpipCoordinator
         self._hass = hass
 
         self._eew: EEW | None = None
         self.simulator: dict | None = None
         self.simulatorTime: datetime | None = None
 
-        self._region: int = _get_config_value(config, CONF_REGION)
-        self._preserve_data: bool = _get_config_value(config, CONF_PRESERVE_DATA, False)
-        self._draw_map: bool = _get_config_value(config, CONF_DRAW_MAP, False)
+        self._region: int = _get_config_value(config_entry, CONF_REGION)
+        self._preserve_data: bool = _get_config_value(
+            config_entry, CONF_PRESERVE_DATA, False
+        )
+        self._draw_map: bool = _get_config_value(config_entry, CONF_DRAW_MAP, False)
 
-        self._attr_name = f"{DEFAULT_NAME} {self._coordinator.region} Notification"
-        self._attr_unique_id = f"{DEFAULT_NAME}_{self._coordinator.region}_notification"
+        if self._dpip is None:
+            attr_name = f"{DEFAULT_NAME} {self._region} Notification"
+        else:
+            email = _get_config_value(config_entry, CONF_EMAIL)
+            attr_name = f"{DEFAULT_NAME} {email} Notification"
+
+        self._attr_name = attr_name
+        self._attr_unique_id = re.sub(r"\s+|@", "_", attr_name.lower())
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config.entry_id)},
+            identifiers={(DOMAIN, config_entry.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
             model=self._coordinator.plan,
@@ -114,8 +134,7 @@ class earthquakeSensor(SensorEntity):
         self._icon = DEFAULT_ICON
         self._state = ""
 
-    # async def async_update(self) -> None:
-    def update(self) -> None:
+    def update(self):
         """Schedule a custom update via the common entity update service."""
 
         data: dict = {}
@@ -133,6 +152,11 @@ class earthquakeSensor(SensorEntity):
             if time.total_seconds() >= 240:
                 self.simulator = None
 
+        if self._dpip is None:
+            region = self._region
+        else:
+            region = self._dpip.dpipData["code"]
+
         eew: EEW | None = None
         if "id" in data:
             eew = EEW.from_dict(data)
@@ -148,8 +172,8 @@ class earthquakeSensor(SensorEntity):
 
             earthquake = eew.earthquake
             earthquakeForecast = EarthquakeData.calc_expected_intensity(
-                earthquake, [REGIONS[self._region]]
-            ).get(self._region)
+                earthquake, [REGIONS[region]]
+            ).get(region)
 
             if earthquakeSerial != old_earthquakeSerial:
                 self._eew = eew
@@ -193,16 +217,17 @@ class earthquakeSensor(SensorEntity):
         else:
             self._attr_value[ATTR_EST] = 0
 
-        self._attr_value[ATTR_NODE] = self._coordinator.station
+        self._attr_value[ATTR_CODE] = region
+        self._attributes[ATTR_NODE] = self._coordinator.station
 
-        if self._preserve_data:
-            return
+        if not self._preserve_data:
+            self._attr_value = {}
+            for i in EARTHQUAKE_ATTR:
+                self._attr_value[i] = ""
+            self._icon = DEFAULT_ICON
+            self._state = ""
 
-        self._attr_value = {}
-        for i in EARTHQUAKE_ATTR:
-            self._attr_value[i] = ""
-        self._icon = DEFAULT_ICON
-        self._state = ""
+        return self
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""

@@ -6,13 +6,14 @@ from collections.abc import Callable
 from io import BytesIO
 import logging
 import os
+import re
 from typing import Any
 
 from PIL import Image
 
 from homeassistant.components.image import ImageEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ATTRIBUTION, CONF_REGION
+from homeassistant.const import ATTR_ATTRIBUTION, CONF_EMAIL, CONF_REGION
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt as dt_util
@@ -23,11 +24,12 @@ from .const import (
     CONF_DRAW_MAP,
     DEFAULT_NAME,
     DOMAIN,
+    DPIP_COORDINATOR,
     MANUFACTURER,
     TREM_COORDINATOR,
     TREM_NAME,
 )
-from .trem_update_coordinator import tremUpdateCoordinator
+from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +46,12 @@ async def async_setup_entry(
         name: str = domain_data[TREM_NAME]
         coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
 
-        device = earthquakeImage(hass, name, config, coordinator)
+        if DPIP_COORDINATOR in domain_data:
+            dpipCoordinator: dpipUpdateCoordinator = domain_data[DPIP_COORDINATOR]
+            device = earthquakeImage(hass, name, config, coordinator, dpipCoordinator)
+        else:
+            device = earthquakeImage(hass, name, config, coordinator)
+
         async_add_devices([device], update_before_add=True)
 
 
@@ -55,26 +62,32 @@ class earthquakeImage(ImageEntity):
         self,
         hass: HomeAssistant,
         name: str,
-        config: ConfigEntry,
+        config_entry: ConfigEntry,
         coordinator: tremUpdateCoordinator,
+        dpipCoordinator: dpipUpdateCoordinator | None = None,
     ) -> None:
         """Initialize the image."""
 
         super().__init__(hass)
 
         self._coordinator = coordinator
+        self._dpip = dpipCoordinator
         self._hass = hass
 
         self._first_draw: bool = False
-        self._region: int | None = _get_config_value(config, CONF_REGION, None)
+        self._region: int = _get_config_value(config_entry, CONF_REGION)
 
-        self._attr_name = f"{DEFAULT_NAME} {self._coordinator.region} Isoseismal Map"
-        self._attr_unique_id = (
-            f"{DEFAULT_NAME}_{self._coordinator.region}_isoseismal_map"
-        )
+        if self._dpip is None:
+            attr_name = f"{DEFAULT_NAME} {self._region} Isoseismal Map"
+        else:
+            email = _get_config_value(config_entry, CONF_EMAIL)
+            attr_name = f"{DEFAULT_NAME} {email} Isoseismal Map"
+
+        self._attr_name = attr_name
+        self._attr_unique_id = re.sub(r"\s+|@", "_", attr_name.lower())
         self._attr_content_type: str = "image/png"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config.entry_id)},
+            identifiers={(DOMAIN, config_entry.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
             model=self._coordinator.plan,

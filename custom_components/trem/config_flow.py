@@ -6,6 +6,7 @@ from http import HTTPStatus
 import json
 import logging
 import os
+import re
 from typing import Any
 
 from aiohttp.client_exceptions import ClientConnectorError
@@ -27,6 +28,7 @@ from homeassistant.const import (
     CONF_NAME,
     CONF_PASSWORD,
     CONF_REGION,
+    CONF_TOKEN,
     CONTENT_TYPE_JSON,
     __version__ as HAVERSION,
 )
@@ -43,12 +45,13 @@ from .const import (
     DOMAIN,
     FREE_PLAN,
     HA_USER_AGENT,
-    LOGIN_URLS,
+    LOGIN_URL,
+    NOTIFY_URL,
     REQUEST_TIMEOUT,
     SUBSCRIBE_PLAN,
     __version__,
 )
-from .exceptions import AccountInvalid, CannotConnect, RegionInvalid
+from .exceptions import AccountInvalid, CannotConnect, FCMTokenInvalid, RegionInvalid
 
 ACTIONS = {
     "customizing": FREE_PLAN,
@@ -86,10 +89,33 @@ async def validate_input(
     Data has the keys from DATA_SCHEMA with values provided by the user.
     """
 
-    if CONF_REGION in user_input:
+    session = async_get_clientsession(hass, verify_ssl=False)
+
+    if CONF_TOKEN in user_input and user_input[CONF_TOKEN] != "":
+        try:
+            fcm_token: str = user_input[CONF_TOKEN]
+
+            payload = {}
+            headers = {
+                ACCEPT: CONTENT_TYPE_JSON,
+                CONTENT_TYPE: CONTENT_TYPE_JSON,
+                USER_AGENT: HA_USER_AGENT,
+            }
+            response = await session.request(
+                method=METH_GET,
+                url=f"{NOTIFY_URL}/info/{fcm_token}",
+                data=json.dumps(payload),
+                headers=headers,
+                timeout=REQUEST_TIMEOUT,
+            )
+
+            if response.status != HTTPStatus.OK:
+                raise FCMTokenInvalid
+        except (ClientConnectorError, TimeoutError) as ex:
+            _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
+    elif CONF_REGION in user_input and user_input[CONF_REGION] != "":
         codes = await getRegionCode()
-        region: int = user_input[CONF_REGION]
-        if region not in codes:
+        if int(user_input[CONF_REGION]) not in codes:
             raise RegionInvalid
     else:
         raise RegionInvalid
@@ -98,7 +124,6 @@ async def validate_input(
         try:
             account: str = user_input[CONF_EMAIL]
             password: str = user_input[CONF_PASSWORD]
-            session = async_get_clientsession(hass, verify_ssl=False)
             payload = {
                 CONF_EMAIL: account,
                 CONF_PASS: password,
@@ -111,16 +136,16 @@ async def validate_input(
             }
             response = await session.request(
                 method=METH_POST,
-                url=LOGIN_URLS,
+                url=LOGIN_URL,
                 data=json.dumps(payload),
                 headers=headers,
                 timeout=REQUEST_TIMEOUT,
             )
 
-            if response.status == HTTPStatus.BAD_REQUEST:
+            if response.status != HTTPStatus.OK:
                 raise AccountInvalid
         except (ClientConnectorError, TimeoutError) as ex:
-            _LOGGER.error(f"Unable to login to account, server error. {ex}")
+            _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
         else:
             return True
 
@@ -128,12 +153,11 @@ async def validate_input(
 
     if CONF_NODE in user_input:
         uri: str = user_input[CONF_NODE]
-        if uri == "random" or uri in BASE_URLS:
+        if uri.lower() == "random" or uri in BASE_URLS:
             return True
 
         if validators.url(uri):
             try:
-                session = async_get_clientsession(hass, verify_ssl=False)
                 payload = {}
                 headers = {
                     ACCEPT: CONTENT_TYPE_JSON,
@@ -148,11 +172,11 @@ async def validate_input(
                     timeout=REQUEST_TIMEOUT,
                 )
 
-                if response.status == HTTPStatus.OK:
-                    return True
+                if response.status != HTTPStatus.OK:
+                    raise CannotConnect
             except ClientConnectorError as ex:
                 _LOGGER.error(
-                    f"Failed fetching data from HTTP API({uri}), {ex.strerror}."
+                    f"Failed fetching data from HTTP API({uri}), {ex.strerror}."  # noqa: G004
                 )
             else:
                 return True
@@ -171,19 +195,20 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize flow."""
 
-        self._region: int | None = None
+        self._region: str | None = None
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
+        self._token: str | None = None
         self._preserve_data: bool | None = None
         self._draw_map: bool | None = None
 
     @staticmethod
     @callback
-    def async_get_options_flow(config: ConfigEntry):
+    def async_get_options_flow(config_entry: ConfigEntry):
         """Get option flow."""
 
-        return OptionsFlowHandler(config)
+        return OptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Handle the initial step."""
@@ -210,12 +235,11 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             user_input = {}
         else:
-            region_code: str = user_input.get(CONF_REGION, "")
-
-            await self.async_set_unique_id(f"{DOMAIN}_{region_code}_monitoring")
-            self._abort_if_unique_id_configured()
-
             try:
+                region_code = int(user_input.get(CONF_REGION, ""))
+                await self.async_set_unique_id(f"{DOMAIN}_{region_code}_monitoring")
+                self._abort_if_unique_id_configured()
+
                 valid = await validate_input(self.hass, user_input)
                 if valid:
                     codes: dict = await getRegionCode()
@@ -224,6 +248,8 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
                     return self.async_create_entry(title=title, data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
+            except FCMTokenInvalid:
+                errors["base"] = "token_invalid"
             except RegionInvalid:
                 errors["base"] = "region_invalid"
             except Exception:
@@ -236,7 +262,7 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_REGION, default=self._region): int,
+                vol.Required(CONF_REGION, default=self._region): str,
                 vol.Required(CONF_NODE, default="random"): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
@@ -258,40 +284,42 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             user_input = {}
         else:
-            email: str = user_input.get(CONF_EMAIL, "")
-            region_code: str = user_input.get(CONF_REGION, "")
+            email = user_input.get(CONF_EMAIL, "")
+            name = f"{DOMAIN} {email} Monitoring"
+            unique_id = re.sub(r"\s+|@", "_", name.lower())
 
-            await self.async_set_unique_id(f"{DOMAIN}_{email}_monitoring")
+            await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
 
             try:
                 valid = await validate_input(self.hass, user_input)
                 if valid:
-                    codes = await getRegionCode()
-                    title: str = codes[region_code]
-
-                    return self.async_create_entry(title=title, data=user_input)
+                    return self.async_create_entry(title=email, data=user_input)
             except AccountInvalid:
                 errors["base"] = "account_invalid"
             except CannotConnect:
                 errors["base"] = "cannot_connect"
+            except FCMTokenInvalid:
+                errors["base"] = "token_invalid"
             except RegionInvalid:
                 errors["base"] = "region_invalid"
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
+        self._email = user_input.get(CONF_EMAIL, "")
+        self._password = user_input.get(CONF_PASSWORD, "")
         self._region = user_input.get(CONF_REGION, "")
-        self._email = user_input.get(CONF_EMAIL, False)
-        self._password = user_input.get(CONF_PASSWORD, False)
+        self._token = user_input.get(CONF_TOKEN, "")
         self._preserve_data = user_input.get(CONF_PRESERVE_DATA, False)
         self._draw_map = user_input.get(CONF_DRAW_MAP, False)
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_REGION, default=self._region): int,
                 vol.Required(CONF_EMAIL, default=self._email): str,
                 vol.Required(CONF_PASSWORD, default=self._password): str,
+                vol.Optional(CONF_REGION, default=self._region): str,
+                vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }
@@ -307,14 +335,15 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Handle options flow changes."""
 
-    def __init__(self, config: ConfigEntry) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize flow."""
 
-        self._config = config
-        self._region: int | None = None
+        self._config = config_entry
+        self._region: str | None = None
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
+        self._token: str | None = None
         self._preserve_data: bool | None = None
         self._draw_map: bool | None = None
 
@@ -334,8 +363,7 @@ class OptionsFlowHandler(OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
-                region_code = self._config.options.get(CONF_REGION, "")
-                user_input[CONF_REGION] = region_code
+                user_input[CONF_REGION] = self._config.options.get(CONF_REGION, "")
 
                 valid = await validate_input(self.hass, user_input)
                 if valid:
@@ -381,8 +409,7 @@ class OptionsFlowHandler(OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
-                region_code = self._config.options.get(CONF_REGION, "")
-                user_input[CONF_REGION] = region_code
+                user_input[CONF_REGION] = self._config.options.get(CONF_REGION, "")
 
                 valid = await validate_input(self.hass, user_input)
                 if valid:
@@ -397,6 +424,8 @@ class OptionsFlowHandler(OptionsFlow):
                 errors["base"] = "account_invalid"
             except CannotConnect:
                 errors["base"] = "cannot_connect"
+            except FCMTokenInvalid:
+                errors["base"] = "token_invalid"
             except RegionInvalid:
                 errors["base"] = "region_invalid"
             except Exception:
@@ -404,16 +433,17 @@ class OptionsFlowHandler(OptionsFlow):
                 errors["base"] = "unknown"
 
         self._region = self._config.options.get(CONF_REGION, "")
-        self._email = self._config.options.get(CONF_EMAIL, False)
-        self._password = self._config.options.get(CONF_PASSWORD, False)
+        self._email = self._config.options.get(CONF_EMAIL, "")
+        self._password = self._config.options.get(CONF_PASSWORD, "")
+        self._token = self._config.options.get(CONF_TOKEN, "")
         self._preserve_data = self._config.options.get(CONF_PRESERVE_DATA, False)
         self._draw_map = self._config.options.get(CONF_DRAW_MAP, False)
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_REGION, default=self._region): int,
                 vol.Required(CONF_EMAIL, default=self._email): str,
-                vol.Required(CONF_PASSWORD, default=self._password): str,
+                vol.Optional(CONF_PASSWORD, default=self._password): str,
+                vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }

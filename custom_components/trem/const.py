@@ -19,7 +19,7 @@ ISSUE_URL = f"{PROJECT_URL}issues"
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.0.8"
+__version__ = "1.3.0"
 
 # Earthquake Icon
 EARTHQUAKE_ICON = {
@@ -48,6 +48,7 @@ ATTR_LOC = "location"
 ATTR_TIME = "time_of_occurrence"
 ATTR_INT = "intensity"
 ATTR_EST = "estimate"
+ATTR_CODE = "code"
 ATTR_NODE = "API_Node"
 ATTR_EQDATA = "earthquake_data"
 EARTHQUAKE_ATTR = [
@@ -61,6 +62,7 @@ EARTHQUAKE_ATTR = [
     ATTR_TIME,
     ATTR_INT,
     ATTR_EST,
+    ATTR_CODE,
 ]
 TSUNAMI_ATTR = [
     ATTR_ID,
@@ -75,17 +77,18 @@ CONF_PASS = "pass"
 CONF_PRESERVE_DATA = "preserve_data"
 
 # Coordinator
+DPIP_COORDINATOR = "dpip_coordinator"
 TREM_COORDINATOR = "trem_coordinator"
 TREM_NAME = "trem_name"
 UPDATE_LISTENER = "update_listener"
 HTTPS_API_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=5)
 WEBSOCKET_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=1)
+DPIP_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=300)
 
 # REST
 HA_USER_AGENT = (
     "TREM custom integration for Home Assistant (https://github.com/j1a-t13n/ha-trem)"
 )
-LOGIN_URLS = "https://api-1.exptech.dev/api/v3/et/login"
 BASE_URLS = {
     "tainan_cache_limit": "https://api-1.exptech.com.tw",
     "tainan_cache": "https://api-1.exptech.dev",
@@ -98,6 +101,8 @@ BASE_URLS = {
     "taipei_2": "https://lb-3.exptech.com.tw",
     "pingtung_2": "https://lb-4.exptech.com.tw",
 }
+LOGIN_URL = "https://api-1.exptech.dev/api/v3/et/login"
+NOTIFY_URL = "https://api-1.exptech.dev/api/v1/notify"
 REQUEST_TIMEOUT = 30  # seconds
 
 # Websocket

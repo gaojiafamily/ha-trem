@@ -4,7 +4,7 @@ from homeassistant import exceptions
 
 
 class AccountInvalid(exceptions.HomeAssistantError):
-    """Error to indicate we cannot connect."""
+    """Represents an account cannot log in."""
 
 
 class CannotConnect(exceptions.HomeAssistantError):
@@ -12,7 +12,11 @@ class CannotConnect(exceptions.HomeAssistantError):
 
 
 class RegionInvalid(exceptions.HomeAssistantError):
-    """Error to indicate we not found."""
+    """Represents a region code is invalid."""
+
+
+class FCMTokenInvalid(exceptions.HomeAssistantError):
+    """Represents a FCM Token is invalid."""
 
 
 class UnknownError(exceptions.HomeAssistantError):

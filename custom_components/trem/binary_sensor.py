@@ -22,7 +22,7 @@ from .const import (
     TREM_COORDINATOR,
     TREM_NAME,
 )
-from .trem_update_coordinator import tremUpdateCoordinator
+from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,19 +30,19 @@ SCAN_INTERVAL = timedelta(seconds=1)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, config: ConfigEntry, async_add_devices: Callable
+    hass: HomeAssistant, config_entry: ConfigEntry, async_add_devices: Callable
 ) -> None:
     """Set up the TREM binary sensor from config."""
 
-    domain_data: dict = hass.data[DOMAIN][config.entry_id]
+    domain_data: dict = hass.data[DOMAIN][config_entry.entry_id]
     name: str = domain_data[TREM_NAME]
     coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
 
-    not_membership = _get_config_value(config, CONF_EMAIL, False) is False
+    not_membership = _get_config_value(config_entry, CONF_EMAIL, False) is False
     if not_membership:
         return
 
-    rts_device = rtsSensor(hass, name, config, coordinator)
+    rts_device = rtsSensor(hass, name, config_entry, coordinator)
     async_add_devices(
         [
             rts_device,
@@ -58,7 +58,7 @@ class rtsSensor(BinarySensorEntity):
         self,
         hass: HomeAssistant,
         name: str,
-        config: ConfigEntry,
+        config_entry: ConfigEntry,
         coordinator: tremUpdateCoordinator,
     ) -> None:
         """Initialize the sensor."""
@@ -69,31 +69,35 @@ class rtsSensor(BinarySensorEntity):
         self._attr_name = "RTS Notification"
         self._attr_unique_id = "rts_notification"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config.entry_id)},
+            identifiers={(DOMAIN, config_entry.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
             model=self._coordinator.plan,
         )
 
-        self._state = False
-        self._attributes = {}
-        self._attr_value = {}
+        self._state: bool = False
+        self._attributes: dict = {}
+        self._attr_value: dict = {}
 
-    def update(self) -> None:
+    def update(self):
         """Schedule a custom update via the common entity update service."""
-        rtsData: dict = self._coordinator.rtsData
 
+        self._attributes[ATTR_NODE] = self._coordinator.station
+
+        rtsData: dict = self._coordinator.rtsData
         if "int" in rtsData:
             rts: list = rtsData["int"]
+            if len(rts) == 0:
+                self._attr_value = {}
+            else:
+                for k in rts:
+                    self._attr_value[k["code"]] = k["i"]
 
-            for k in rts:
-                self._attr_value[k["code"]] = k["i"]
+                self._state = True
+                return self
 
-            self._state = len(rts) > 2
-        else:
-            self._state = False
-
-        self._attr_value[ATTR_NODE] = self._coordinator.station
+        self._state = False
+        return self
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""
@@ -112,7 +116,7 @@ class rtsSensor(BinarySensorEntity):
         return True
 
     @property
-    def state(self) -> str:
+    def state(self) -> bool:
         """Return the state of the sensor."""
 
         return self._state

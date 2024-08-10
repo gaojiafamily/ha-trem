@@ -12,6 +12,7 @@ from homeassistant.const import (
     CONF_EMAIL,
     CONF_PASSWORD,
     CONF_REGION,
+    CONF_TOKEN,
     MAJOR_VERSION,
     MINOR_VERSION,
 )
@@ -23,6 +24,8 @@ from .const import (
     CONF_PASS,
     DEFAULT_NAME,
     DOMAIN,
+    DPIP_COORDINATOR,
+    DPIP_COORDINATOR_UPDATE_INTERVAL,
     HTTPS_API_COORDINATOR_UPDATE_INTERVAL,
     MIN_HA_MAJ_VER,
     MIN_HA_MIN_VER,
@@ -36,12 +39,12 @@ from .const import (
     __version__,
 )
 from .services import register_services
-from .trem_update_coordinator import tremUpdateCoordinator
+from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, config: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up a TREM integration from a config entry."""
 
     if not is_valid_ha_version():
@@ -54,14 +57,17 @@ async def async_setup_entry(hass: HomeAssistant, config: ConfigEntry) -> bool:
         _LOGGER.warning(msg)
         return False
 
-    node: str | dict = _get_config_value(config, CONF_NODE, "")
-    region: int | None = _get_config_value(config, CONF_REGION, None)
-    email: str | None = _get_config_value(config, CONF_EMAIL, None)
-    passwd: str | None = _get_config_value(config, CONF_PASSWORD, None)
+    node: str | dict = _get_config_value(config_entry, CONF_NODE, "")
+    region: int = _get_config_value(config_entry, CONF_REGION, None)
+    token: str | None = _get_config_value(config_entry, CONF_TOKEN, None)
+    email: str | None = _get_config_value(config_entry, CONF_EMAIL, None)
+    passwd: str | None = _get_config_value(config_entry, CONF_PASSWORD, None)
 
     # migrate data (also after first setup) to options
-    if config.data:
-        hass.config_entries.async_update_entry(config, data={}, options=config.data)
+    if config_entry.data:
+        hass.config_entries.async_update_entry(
+            config_entry, data={}, options=config_entry.data
+        )
 
     if email is None:
         base_info = node
@@ -72,49 +78,73 @@ async def async_setup_entry(hass: HomeAssistant, config: ConfigEntry) -> bool:
             CONF_PASS: passwd,
         }
         update_interval = WEBSOCKET_COORDINATOR_UPDATE_INTERVAL
+        dpip_update_interval = DPIP_COORDINATOR_UPDATE_INTERVAL
 
     # Fetch initial data so we have data when entities subscribe
-    coordinator = tremUpdateCoordinator(
-        hass,
-        base_info,
-        region,
-        update_interval,
-    )
-    await coordinator.async_config_entry_first_refresh()
-
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][config.entry_id] = {
-        TREM_COORDINATOR: coordinator,
-        TREM_NAME: f"{DEFAULT_NAME} {region} Monitoring",
-    }
+    domain_data: dict = {}
+
+    if token is None:
+        tremCoordinator = tremUpdateCoordinator(
+            hass,
+            base_info,
+            region,
+            update_interval,
+        )
+        domain_data = {
+            TREM_COORDINATOR: tremCoordinator,
+            TREM_NAME: f"{DEFAULT_NAME} {region} Monitoring",
+        }
+    else:
+        tremCoordinator = tremUpdateCoordinator(
+            hass,
+            base_info,
+            "auto",
+            update_interval,
+        )
+        dpipCoordinator = dpipUpdateCoordinator(
+            hass,
+            token,
+            dpip_update_interval,
+        )
+        domain_data = {
+            DPIP_COORDINATOR: dpipCoordinator,
+            TREM_COORDINATOR: tremCoordinator,
+            TREM_NAME: f"{DEFAULT_NAME} {email}",
+        }
+
+        await dpipCoordinator.async_config_entry_first_refresh()
+
+    await tremCoordinator.async_config_entry_first_refresh()
+    hass.data[DOMAIN][config_entry.entry_id] = domain_data
 
     for platform in PLATFORMS:
         hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(config, platform)
+            hass.config_entries.async_forward_entry_setup(config_entry, platform)
         )
 
-    update_listener = config.add_update_listener(async_update_options)
-    hass.data[DOMAIN][config.entry_id][UPDATE_LISTENER] = update_listener
+    update_listener = config_entry.add_update_listener(async_update_options)
+    hass.data[DOMAIN][config_entry.entry_id][UPDATE_LISTENER] = update_listener
     register_services(hass)
 
     _LOGGER.info(STARTUP)
     return True
 
 
-async def async_update_options(hass: HomeAssistant, config: ConfigEntry):
+async def async_update_options(hass: HomeAssistant, config_entry: ConfigEntry):
     """Handle options update."""
 
-    await hass.config_entries.async_reload(config.entry_id)
+    await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, config: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Unload a config entry."""
 
-    _email = _get_config_value(config, CONF_EMAIL, None)
+    _email = _get_config_value(config_entry, CONF_EMAIL, None)
     if _email is None:
         pass
     else:
-        coordinator: tremUpdateCoordinator = hass.data[DOMAIN][config.entry_id][
+        coordinator: tremUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id][
             TREM_COORDINATOR
         ]
         await coordinator.connection.close()
@@ -122,26 +152,26 @@ async def async_unload_entry(hass: HomeAssistant, config: ConfigEntry):
     unload_ok = all(
         await asyncio.gather(
             *[
-                hass.config_entries.async_forward_entry_unload(config, platform)
+                hass.config_entries.async_forward_entry_unload(config_entry, platform)
                 for platform in PLATFORMS
             ]
         )
     )
 
     if unload_ok:
-        update_listener = hass.data[DOMAIN][config.entry_id][UPDATE_LISTENER]
+        update_listener = hass.data[DOMAIN][config_entry.entry_id][UPDATE_LISTENER]
         update_listener()
-        hass.data[DOMAIN].pop(config.entry_id)
+        hass.data[DOMAIN].pop(config_entry.entry_id)
         if not hass.data[DOMAIN]:
             hass.data.pop(DOMAIN)
     return unload_ok
 
 
-async def async_reload_entry(hass: HomeAssistant, config: ConfigEntry) -> None:
+async def async_reload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Reload a config entry."""
 
-    await async_unload_entry(hass, config)
-    await async_setup_entry(hass, config)
+    await async_unload_entry(hass, config_entry)
+    await async_setup_entry(hass, config_entry)
 
 
 def is_min_ha_version(min_ha_major_ver: int, min_ha_minor_ver: int) -> bool:

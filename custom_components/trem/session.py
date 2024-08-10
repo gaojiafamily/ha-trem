@@ -30,7 +30,7 @@ from .const import (
     CLIENT_NAME,
     DEFAULT_MAX_MSG_SIZE,
     HA_USER_AGENT,
-    LOGIN_URLS,
+    LOGIN_URL,
     REQUEST_TIMEOUT,
     __version__,
 )
@@ -77,6 +77,7 @@ class WebSocketConnection:
 
         self._connection: ClientWebSocketResponse | None = None
         self._session = async_get_clientsession(hass)
+        self.is_running = False
         self._is_stopping = False
 
         self._url = url
@@ -97,8 +98,7 @@ class WebSocketConnection:
     async def connect(self):
         """Connect to TREM websocket..."""
 
-        async def _async_stop_handler(event):
-            await asyncio.gather(*[self.close()])
+        self.is_running = True
 
         try:
             session = self._session
@@ -117,17 +117,22 @@ class WebSocketConnection:
         except Exception:  # noqa: BLE001
             raise CannotConnect  # noqa: B904
 
+        async def _async_stop_handler(event):
+            await asyncio.gather(*[self.close()])
+
         try:
             self._hass.bus.async_listen_once(
                 EVENT_HOMEASSISTANT_STOP, _async_stop_handler
             )
             await asyncio.gather(*[self._recv()])
         except Exception:  # noqa: BLE001
+            await self.close()
             raise UnknownError  # noqa: B904
 
     async def close(self):
         """Close connection."""
 
+        self.is_running = False
         self._is_stopping = True
         if self._connection is not None:
             await self._connection.close()
@@ -177,6 +182,7 @@ class WebSocketConnection:
                     eventType: dict = data.get("type")
 
                     if eventType == WebSocketEvent.EEW.value:
+                        _LOGGER.debug("recv: %s", msg_data)
                         if msg_data["author"] == "cwa":
                             self.earthquakeData = data.get("data")
 
@@ -187,9 +193,10 @@ class WebSocketConnection:
                         if msg_data["author"] == "cwa":
                             self.tsunamiData = data.get("data")
             except ConnectionResetError:
+                await self.close()
                 raise WebSocketClosure  # noqa: B904
             except TimeoutError as ex:
-                _LOGGER.error(f"Unable to login to account, server error. {ex}")
+                _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
                 break
             except (KeyboardInterrupt, SystemExit):
                 await self.close()
@@ -228,7 +235,7 @@ class WebSocketConnection:
 
         if self._connection is None:
             return False
-        if self._connection.closed:
+        if self._is_stopping or self._connection.closed:
             return False
 
         return True
@@ -257,7 +264,7 @@ class WebSocketConnection:
                 }
                 response = await self._session.request(
                     method=METH_POST,
-                    url=LOGIN_URLS,
+                    url=LOGIN_URL,
                     data=json.dumps(payload),
                     headers=headers,
                     timeout=REQUEST_TIMEOUT,
@@ -268,7 +275,7 @@ class WebSocketConnection:
                     _LOGGER.error(
                         f"""
                         Failed fetching token from Exptech Membership API, \n
-                        {message['message']} (HTTP Status Code = {response.status})."""
+                        {message['message']} (HTTP Status Code = {response.status})."""  # noqa: G004
                     )
                 else:
                     token = await response.text()
@@ -277,7 +284,7 @@ class WebSocketConnection:
                     return token
             except ClientConnectorError as ex:
                 _LOGGER.error(
-                    f"Failed fetching token from Exptech Membership API, {ex.strerror}."
+                    f"Failed fetching token from Exptech Membership API, {ex.strerror}."  # noqa: G004
                 )
             except TooManyRedirects:
                 _LOGGER.error(
@@ -290,6 +297,7 @@ class WebSocketConnection:
         else:
             return self._access_token
 
+        await self.close()
         raise CannotConnect
 
     async def _handle_error(self, msg_data: dict) -> bool:
