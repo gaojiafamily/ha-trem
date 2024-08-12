@@ -9,14 +9,16 @@ import os
 import voluptuous as vol
 
 from homeassistant.components.image import ImageEntity
-from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_platform import async_get_platforms
+from homeassistant.helpers.entity_registry import RegistryEntry
 
-from .const import ATTR_EQDATA, ATTR_FILENAME, DOMAIN
+from .const import ATTR_EQDATA, ATTR_FILENAME, DOMAIN, DPIP_COORDINATOR
+from .sensor import earthquakeSensor
+from .update_coordinator import dpipUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ def register_services(hass: HomeAssistant) -> None:
 
     async def save_image(service_call: ServiceCall) -> None:
         """Save the image to path."""
+
         entity_id = service_call.data[ATTR_ENTITY_ID]
         filepath = service_call.data[ATTR_FILENAME]
 
@@ -65,9 +68,8 @@ def register_services(hass: HomeAssistant) -> None:
         except OSError as err:
             _LOGGER.error("Can't write image to file: %s", err)
 
-    @callback
     async def simulator_eartkquake(service_call: ServiceCall) -> None:
-        """Set up the simulator eartkquake service."""
+        """Set up the earthquake simulator service."""
 
         entity_id: str | None = service_call.data[ATTR_ENTITY_ID]
         eartkquakeData: dict = service_call.data[ATTR_EQDATA]
@@ -76,9 +78,9 @@ def register_services(hass: HomeAssistant) -> None:
         if len(platforms) < 1:
             raise HomeAssistantError(f"Integration not found: {DOMAIN}")
 
-        entity: SensorEntity | None = None
+        entity: earthquakeSensor | None = None
         for platform in platforms:
-            entity_tmp: SensorEntity | None = platform.entities.get(entity_id, None)
+            entity_tmp = platform.entities.get(entity_id, None)
             if entity_tmp is not None:
                 entity = entity_tmp
                 break
@@ -89,6 +91,32 @@ def register_services(hass: HomeAssistant) -> None:
 
         _LOGGER.debug("Starting simulator earthquake.")
         entity.simulator = json.loads(eartkquakeData)
+
+    async def update_location(service_call: ServiceCall) -> None:
+        """Update my location (using DPIP)."""
+
+        entity_id: str | None = service_call.data[ATTR_ENTITY_ID]
+
+        platforms = async_get_platforms(hass, DOMAIN)
+        if len(platforms) < 1:
+            raise HomeAssistantError(f"Integration not found: {DOMAIN}")
+
+        entity: earthquakeSensor | None = None
+        for platform in platforms:
+            entity_tmp = platform.entities.get(entity_id, None)
+            if entity_tmp is not None:
+                entity = entity_tmp
+                break
+        if entity is None:
+            raise HomeAssistantError(
+                f"Could not find entity {entity_id} from integration {DOMAIN}"
+            )
+
+        config_entry: RegistryEntry = entity.registry_entry
+        domain_data: dict = hass.data[DOMAIN][config_entry.config_entry_id]
+
+        dpip: dpipUpdateCoordinator = domain_data[DPIP_COORDINATOR]
+        await dpip.async_update_data()
 
     hass.services.async_register(
         DOMAIN,
@@ -110,6 +138,17 @@ def register_services(hass: HomeAssistant) -> None:
             {
                 vol.Required(ATTR_ENTITY_ID): cv.entity_id,
                 vol.Required(ATTR_FILENAME): cv.string,
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "update_location",
+        update_location,
+        vol.Schema(
+            {
+                vol.Required(ATTR_ENTITY_ID): cv.entity_id,
             }
         ),
     )

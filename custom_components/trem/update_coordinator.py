@@ -262,12 +262,13 @@ class dpipUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="DPIP",
+            update_method=self.async_update_data,
             update_interval=self._update_interval,
         )
 
         _LOGGER.debug("Fetching DPIP data...")
 
-    async def _async_update_data(self) -> Any | None:
+    async def async_update_data(self) -> Any | None:
         """Poll DPIP data from notify api."""
 
         response: ClientResponse | None = None

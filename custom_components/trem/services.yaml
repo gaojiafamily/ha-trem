@@ -38,3 +38,16 @@ save:
       example: "/tmp/snapshot_{{ entity_id.name }}.png"
       selector:
         text:
+
+update_location:
+  name: Update location
+  description: Fetch DPIP client location of the entity.
+  fields:
+    entity_id:
+      name: Entity
+      example: "sensor.trem_202_notification"
+      required: true
+      selector:
+        entity:
+          integration: trem
+          domain: sensor
