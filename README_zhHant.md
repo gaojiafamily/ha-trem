@@ -156,16 +156,16 @@
 AGPL-3.0 license
 
 
-[releases-shield]: https://img.shields.io/github/release/J1A-T13N/ha-trem.svg?style=for-the-badge
-[releases]: https://github.com/J1A-T13N/ha-trem/releases
+[releases-shield]: https://img.shields.io/github/release/gaojiafamily/ha-trem.svg?style=for-the-badge
+[releases]: https://github.com/gaojiafamily/ha-trem/releases
 [hacs_custom_shield]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [hacs_custom]: https://hacs.xyz/docs/faq/custom_repositories
-[stars-shield]: https://img.shields.io/github/stars/J1A-T13N/ha-trem.svg?style=for-the-badge
-[stars-url]: https://github.com/watermelon1024/EEW/stargazers
-[issues-shield]: https://img.shields.io/github/issues/J1A-T13N/ha-trem.svg?style=for-the-badge
-[issues-url]: https://github.com/J1A-T13N/ha-trem/issues
-[contributors-shield]: https://img.shields.io/github/contributors/J1A-T13N/ha-trem.svg?style=for-the-badge
-[contributors-url]: https://github.com/J1A-T13N/ha-trem/graphs/contributors
-[license-shield]: https://img.shields.io/github/license/J1A-T13N/ha-trem.svg?style=for-the-badge
+[stars-shield]: https://img.shields.io/github/stars/gaojiafamily/ha-trem.svg?style=for-the-badge
+[stars-url]: https://github.com/gaojiafamily/ha-trem/stargazers
+[issues-shield]: https://img.shields.io/github/issues/gaojiafamily/ha-trem.svg?style=for-the-badge
+[issues-url]: https://github.com/gaojiafamily/ha-trem/issues
+[contributors-shield]: https://img.shields.io/github/contributors/gaojiafamily/ha-trem.svg?style=for-the-badge
+[contributors-url]: https://github.com/gaojiafamily/ha-trem/graphs/contributors
+[license-shield]: https://img.shields.io/github/license/gaojiafamily/ha-trem.svg?style=for-the-badge
 [buymecoffee-shield]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
 [buymecoffee]: https://www.buymeacoffee.com/j1at13n
