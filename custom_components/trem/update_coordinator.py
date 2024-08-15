@@ -8,7 +8,6 @@ from io import BytesIO
 import json
 import logging
 import random
-from typing import Any
 
 from aiohttp import ClientResponse, WebSocketError
 from aiohttp.client_exceptions import ClientConnectorError
@@ -30,7 +29,6 @@ from .const import (
     DOMAIN,
     FREE_PLAN,
     HA_USER_AGENT,
-    NOTIFY_URL,
     REQUEST_TIMEOUT,
     SUBSCRIBE_PLAN,
 )
@@ -214,6 +212,7 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                 if not self.connection.is_running:
                     self.connection = None
                     _LOGGER.warning("Reconnecting websocket...")
+                self.retry = self.retry + 1
                 raise UpdateFailed
 
         return self
@@ -238,73 +237,6 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         )
 
         return station
-
-
-class dpipUpdateCoordinator(DataUpdateCoordinator):
-    """Class for handling the DPIP data retrieval."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        token: str,
-        update_interval: timedelta,
-    ) -> None:
-        """Initialize the data object."""
-
-        self._hass = hass
-        self._update_interval = update_interval
-
-        self.session = async_get_clientsession(hass)
-        self.dpipData: dict = {}
-        self.token = token
-
-        super().__init__(
-            hass,
-            _LOGGER,
-            name="DPIP",
-            update_method=self.async_update_data,
-            update_interval=self._update_interval,
-        )
-
-        _LOGGER.debug("Fetching DPIP data...")
-
-    async def async_update_data(self) -> Any | None:
-        """Poll DPIP data from notify api."""
-
-        response: ClientResponse | None = None
-        payload = {}
-        headers = {
-            ACCEPT: CONTENT_TYPE_JSON,
-            CONTENT_TYPE: CONTENT_TYPE_JSON,
-            USER_AGENT: HA_USER_AGENT,
-        }
-
-        try:
-            response = await self.session.request(
-                method=METH_GET,
-                url=f"{NOTIFY_URL}/info/{self.token}",
-                data=json.dumps(payload),
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
-        except ClientConnectorError as ex:
-            _LOGGER.error(f"Failed fetching DPIP data, {ex.strerror}.")  # noqa: G004
-            raise UpdateFailed  # noqa: B904
-        except TimeoutError as ex:
-            _LOGGER.error(f"Failed fetching DPIP data, {ex.strerror}.")  # noqa: G004
-            raise UpdateFailed  # noqa: B904
-        except Exception:
-            _LOGGER.exception("An unexpected exception occurred fetching DPIP data.")
-            raise UpdateFailed  # noqa: B904
-        else:
-            if response.ok:
-                self.dpipData = await response.json()
-            else:
-                _LOGGER.error(
-                    f"Failed fetching DPIP data, (HTTP Status Code = {response.status})."  # noqa: G004
-                )
-
-        return self
 
 
 async def _notify_message(

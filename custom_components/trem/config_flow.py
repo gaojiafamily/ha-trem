@@ -46,7 +46,6 @@ from .const import (
     FREE_PLAN,
     HA_USER_AGENT,
     LOGIN_URL,
-    NOTIFY_URL,
     REQUEST_TIMEOUT,
     SUBSCRIBE_PLAN,
     __version__,
@@ -82,7 +81,9 @@ async def getRegionCode() -> dict:
 
 
 async def validate_input(
-    hass: core.HomeAssistant, user_input: dict[str, Any] | None
+    hass: core.HomeAssistant,
+    user_input: dict[str, Any] | None,
+    return_region: bool = False,
 ) -> bool:
     """Validate that the user input allows us to connect to DataPoint.
 
@@ -90,32 +91,13 @@ async def validate_input(
     """
 
     session = async_get_clientsession(hass, verify_ssl=False)
+    region_name: str = ""
 
-    if CONF_TOKEN in user_input and user_input[CONF_TOKEN] != "":
-        try:
-            fcm_token: str = user_input[CONF_TOKEN]
-
-            payload = {}
-            headers = {
-                ACCEPT: CONTENT_TYPE_JSON,
-                CONTENT_TYPE: CONTENT_TYPE_JSON,
-                USER_AGENT: HA_USER_AGENT,
-            }
-            response = await session.request(
-                method=METH_GET,
-                url=f"{NOTIFY_URL}/info/{fcm_token}",
-                data=json.dumps(payload),
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
-
-            if response.status != HTTPStatus.OK:
-                raise FCMTokenInvalid
-        except (ClientConnectorError, TimeoutError) as ex:
-            _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
-    elif CONF_REGION in user_input and user_input[CONF_REGION] != "":
+    if CONF_REGION in user_input:
         codes = await getRegionCode()
-        if int(user_input[CONF_REGION]) not in codes:
+        if user_input[CONF_REGION] in codes:
+            region_name = codes[user_input[CONF_REGION]]
+        else:
             raise RegionInvalid
     else:
         raise RegionInvalid
@@ -147,7 +129,7 @@ async def validate_input(
         except (ClientConnectorError, TimeoutError) as ex:
             _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
         else:
-            return True
+            return region_name if return_region else True
 
         raise CannotConnect
 
@@ -179,7 +161,7 @@ async def validate_input(
                     f"Failed fetching data from HTTP API({uri}), {ex.strerror}."  # noqa: G004
                 )
             else:
-                return True
+                return region_name if return_region else True
 
             raise CannotConnect
 
@@ -195,7 +177,7 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize flow."""
 
-        self._region: str | None = None
+        self._region: int | None = None
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
@@ -236,16 +218,15 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
             user_input = {}
         else:
             try:
-                region_code = int(user_input.get(CONF_REGION, ""))
+                region_code = user_input.get(CONF_REGION, None)
                 await self.async_set_unique_id(f"{DOMAIN}_{region_code}_monitoring")
                 self._abort_if_unique_id_configured()
 
-                valid = await validate_input(self.hass, user_input)
-                if valid:
-                    codes: dict = await getRegionCode()
-                    title: str = codes[region_code]
+                title = await validate_input(self.hass, user_input, True)
+                if not title:
+                    raise RegionInvalid
 
-                    return self.async_create_entry(title=title, data=user_input)
+                return self.async_create_entry(title=title, data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except FCMTokenInvalid:
@@ -256,13 +237,13 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
-        self._region = user_input.get(CONF_REGION, "")
+        self._region = user_input.get(CONF_REGION, None)
         self._preserve_data = user_input.get(CONF_PRESERVE_DATA, False)
         self._draw_map = user_input.get(CONF_DRAW_MAP, False)
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_REGION, default=self._region): str,
+                vol.Required(CONF_REGION, default=self._region): int,
                 vol.Required(CONF_NODE, default="random"): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
@@ -309,8 +290,8 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
 
         self._email = user_input.get(CONF_EMAIL, "")
         self._password = user_input.get(CONF_PASSWORD, "")
-        self._region = user_input.get(CONF_REGION, "")
-        self._token = user_input.get(CONF_TOKEN, "")
+        self._region = user_input.get(CONF_REGION, None)
+        # self._token = user_input.get(CONF_TOKEN, "")
         self._preserve_data = user_input.get(CONF_PRESERVE_DATA, False)
         self._draw_map = user_input.get(CONF_DRAW_MAP, False)
 
@@ -318,8 +299,8 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_EMAIL, default=self._email): str,
                 vol.Required(CONF_PASSWORD, default=self._password): str,
-                vol.Optional(CONF_REGION, default=self._region): str,
-                vol.Optional(CONF_TOKEN, default=self._token): str,
+                vol.Required(CONF_REGION, default=self._region): int,
+                # vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }
@@ -339,7 +320,7 @@ class OptionsFlowHandler(OptionsFlow):
         """Initialize flow."""
 
         self._config = config_entry
-        self._region: str | None = None
+        self._region: int | None = None
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
@@ -382,7 +363,7 @@ class OptionsFlowHandler(OptionsFlow):
                 )
                 errors["base"] = "unknown"
 
-        self._region = self._config.options.get(CONF_REGION, "")
+        self._region = self._config.options.get(CONF_REGION, None)
         self._node = self._config.options.get(CONF_NODE, "random")
         self._preserve_data = self._config.options.get(CONF_PRESERVE_DATA, False)
         self._draw_map = self._config.options.get(CONF_DRAW_MAP, False)
@@ -432,7 +413,7 @@ class OptionsFlowHandler(OptionsFlow):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
 
-        self._region = self._config.options.get(CONF_REGION, "")
+        self._region = self._config.options.get(CONF_REGION, None)
         self._email = self._config.options.get(CONF_EMAIL, "")
         self._password = self._config.options.get(CONF_PASSWORD, "")
         self._token = self._config.options.get(CONF_TOKEN, "")
@@ -443,7 +424,7 @@ class OptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_EMAIL, default=self._email): str,
                 vol.Optional(CONF_PASSWORD, default=self._password): str,
-                vol.Optional(CONF_TOKEN, default=self._token): str,
+                # vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }

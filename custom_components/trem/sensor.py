@@ -33,7 +33,6 @@ from .const import (
     DEFAULT_ICON,
     DEFAULT_NAME,
     DOMAIN,
-    DPIP_COORDINATOR,
     EARTHQUAKE_ATTR,
     EARTHQUAKE_ICON,
     MANUFACTURER,
@@ -44,7 +43,7 @@ from .const import (
 )
 from .earthquake.eew import EEW, EarthquakeData
 from .earthquake.location import REGIONS
-from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
+from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,13 +59,7 @@ async def async_setup_entry(
     name: str = domain_data[TREM_NAME]
     coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
 
-    if DPIP_COORDINATOR in domain_data:
-        dpipCoordinator: dpipUpdateCoordinator = domain_data[DPIP_COORDINATOR]
-        earthquake_device = earthquakeSensor(
-            hass, name, config_entry, coordinator, dpipCoordinator
-        )
-    else:
-        earthquake_device = earthquakeSensor(hass, name, config_entry, coordinator)
+    earthquake_device = earthquakeSensor(hass, name, config_entry, coordinator)
 
     not_membership = _get_config_value(config_entry, CONF_EMAIL, False) is False
     if not_membership:
@@ -94,13 +87,12 @@ class earthquakeSensor(SensorEntity):
         name: str,
         config_entry: ConfigEntry,
         coordinator: tremUpdateCoordinator,
-        dpipCoordinator: dpipUpdateCoordinator | None = None,
     ) -> None:
         """Initialize the sensor."""
 
         self._coordinator = coordinator
-        self._dpip = dpipCoordinator
         self._hass = hass
+        self._name = name
 
         self._eew: EEW | None = None
         self.simulator: dict | None = None
@@ -112,17 +104,12 @@ class earthquakeSensor(SensorEntity):
         )
         self._draw_map: bool = _get_config_value(config_entry, CONF_DRAW_MAP, False)
 
-        if self._dpip is None:
-            attr_name = f"{DEFAULT_NAME} {self._region} Notification"
-        else:
-            email = _get_config_value(config_entry, CONF_EMAIL)
-            attr_name = f"{DEFAULT_NAME} {email} Notification"
-
+        attr_name = f"{DEFAULT_NAME} {self._region} Notification"
         self._attr_name = attr_name
         self._attr_unique_id = re.sub(r"\s+|@", "_", attr_name.lower())
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, config_entry.entry_id)},
-            name=name,
+            name=self._name,
             manufacturer=MANUFACTURER,
             model=self._coordinator.plan,
         )
@@ -152,11 +139,6 @@ class earthquakeSensor(SensorEntity):
             if time.total_seconds() >= 240:
                 self.simulator = None
 
-        if self._dpip is None:
-            region = self._region
-        else:
-            region = self._dpip.dpipData["code"]
-
         eew: EEW | None = None
         if "id" in data:
             eew = EEW.from_dict(data)
@@ -172,8 +154,8 @@ class earthquakeSensor(SensorEntity):
 
             earthquake = eew.earthquake
             earthquakeForecast = EarthquakeData.calc_expected_intensity(
-                earthquake, [REGIONS[region]]
-            ).get(region)
+                earthquake, [REGIONS[self._region]]
+            ).get(self._region)
 
             if earthquakeSerial != old_earthquakeSerial:
                 self._eew = eew
@@ -217,7 +199,7 @@ class earthquakeSensor(SensorEntity):
         else:
             self._attr_value[ATTR_EST] = 0
 
-        self._attr_value[ATTR_CODE] = region
+        self._attr_value[ATTR_CODE] = self._name
         self._attributes[ATTR_NODE] = self._coordinator.station
 
         if not self._preserve_data:

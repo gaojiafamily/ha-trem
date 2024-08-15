@@ -42,7 +42,7 @@ async def async_setup_entry(
     if not_membership:
         return
 
-    rts_device = rtsSensor(hass, name, config_entry, coordinator)
+    rts_device = rtsBinarySensor(hass, name, config_entry, coordinator)
     async_add_devices(
         [
             rts_device,
@@ -51,7 +51,7 @@ async def async_setup_entry(
     )
 
 
-class rtsSensor(BinarySensorEntity):
+class rtsBinarySensor(BinarySensorEntity):
     """Defines a rts sensor entity."""
 
     def __init__(

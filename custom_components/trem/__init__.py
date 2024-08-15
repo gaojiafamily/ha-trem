@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 from typing import Any
 
 from homeassistant.components import persistent_notification
@@ -12,7 +14,6 @@ from homeassistant.const import (
     CONF_EMAIL,
     CONF_PASSWORD,
     CONF_REGION,
-    CONF_TOKEN,
     MAJOR_VERSION,
     MINOR_VERSION,
 )
@@ -24,8 +25,6 @@ from .const import (
     CONF_PASS,
     DEFAULT_NAME,
     DOMAIN,
-    DPIP_COORDINATOR,
-    DPIP_COORDINATOR_UPDATE_INTERVAL,
     HTTPS_API_COORDINATOR_UPDATE_INTERVAL,
     MIN_HA_MAJ_VER,
     MIN_HA_MIN_VER,
@@ -39,9 +38,29 @@ from .const import (
     __version__,
 )
 from .services import register_services
-from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
+from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def getRegionCode() -> dict:
+    """Get the region options."""
+
+    directory = os.path.dirname(os.path.realpath(__file__))
+    region_path = os.path.join(directory, "asset/region.json")
+    with open(
+        region_path,
+        encoding="utf-8",
+    ) as f:
+        codes: dict = {}
+        data: dict = json.load(f)
+        for city, region in data.items():
+            for town in region:
+                area = region[town]["area"]
+                if area not in codes:
+                    codes[area] = f"===== {area} ====="
+                codes[region[town]["code"]] = f"{city}{town}"
+    return codes
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
@@ -59,9 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     node: str | dict = _get_config_value(config_entry, CONF_NODE, "")
     region: int = _get_config_value(config_entry, CONF_REGION, None)
-    token: str | None = _get_config_value(config_entry, CONF_TOKEN, None)
     email: str | None = _get_config_value(config_entry, CONF_EMAIL, None)
     passwd: str | None = _get_config_value(config_entry, CONF_PASSWORD, None)
+    codes = await getRegionCode()
 
     # migrate data (also after first setup) to options
     if config_entry.data:
@@ -78,42 +97,21 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             CONF_PASS: passwd,
         }
         update_interval = WEBSOCKET_COORDINATOR_UPDATE_INTERVAL
-        dpip_update_interval = DPIP_COORDINATOR_UPDATE_INTERVAL
 
     # Fetch initial data so we have data when entities subscribe
     hass.data.setdefault(DOMAIN, {})
     domain_data: dict = {}
 
-    if token is None:
-        tremCoordinator = tremUpdateCoordinator(
-            hass,
-            base_info,
-            region,
-            update_interval,
-        )
-        domain_data = {
-            TREM_COORDINATOR: tremCoordinator,
-            TREM_NAME: f"{DEFAULT_NAME} {region} Monitoring",
-        }
-    else:
-        tremCoordinator = tremUpdateCoordinator(
-            hass,
-            base_info,
-            "auto",
-            update_interval,
-        )
-        dpipCoordinator = dpipUpdateCoordinator(
-            hass,
-            token,
-            dpip_update_interval,
-        )
-        domain_data = {
-            DPIP_COORDINATOR: dpipCoordinator,
-            TREM_COORDINATOR: tremCoordinator,
-            TREM_NAME: f"{DEFAULT_NAME} {email}",
-        }
-
-        await dpipCoordinator.async_config_entry_first_refresh()
+    tremCoordinator = tremUpdateCoordinator(
+        hass,
+        base_info,
+        region,
+        update_interval,
+    )
+    domain_data = {
+        TREM_COORDINATOR: tremCoordinator,
+        TREM_NAME: codes[region],
+    }
 
     await tremCoordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][config_entry.entry_id] = domain_data

@@ -19,7 +19,7 @@ ISSUE_URL = f"{PROJECT_URL}issues"
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.3.0"
+__version__ = "1.3.2"
 
 # Earthquake Icon
 EARTHQUAKE_ICON = {
@@ -48,7 +48,7 @@ ATTR_LOC = "location"
 ATTR_TIME = "time_of_occurrence"
 ATTR_INT = "intensity"
 ATTR_EST = "estimate"
-ATTR_CODE = "code"
+ATTR_CODE = "region"
 ATTR_NODE = "API_Node"
 ATTR_EQDATA = "earthquake_data"
 EARTHQUAKE_ATTR = [
@@ -83,7 +83,7 @@ TREM_NAME = "trem_name"
 UPDATE_LISTENER = "update_listener"
 HTTPS_API_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=5)
 WEBSOCKET_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=1)
-DPIP_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=300)
+DPIP_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=60)
 
 # REST
 HA_USER_AGENT = (

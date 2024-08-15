@@ -24,12 +24,11 @@ from .const import (
     CONF_DRAW_MAP,
     DEFAULT_NAME,
     DOMAIN,
-    DPIP_COORDINATOR,
     MANUFACTURER,
     TREM_COORDINATOR,
     TREM_NAME,
 )
-from .update_coordinator import dpipUpdateCoordinator, tremUpdateCoordinator
+from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,12 +45,7 @@ async def async_setup_entry(
         name: str = domain_data[TREM_NAME]
         coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
 
-        if DPIP_COORDINATOR in domain_data:
-            dpipCoordinator: dpipUpdateCoordinator = domain_data[DPIP_COORDINATOR]
-            device = earthquakeImage(hass, name, config, coordinator, dpipCoordinator)
-        else:
-            device = earthquakeImage(hass, name, config, coordinator)
-
+        device = earthquakeImage(hass, name, config, coordinator)
         async_add_devices([device], update_before_add=True)
 
 
@@ -64,25 +58,18 @@ class earthquakeImage(ImageEntity):
         name: str,
         config_entry: ConfigEntry,
         coordinator: tremUpdateCoordinator,
-        dpipCoordinator: dpipUpdateCoordinator | None = None,
     ) -> None:
         """Initialize the image."""
 
         super().__init__(hass)
 
         self._coordinator = coordinator
-        self._dpip = dpipCoordinator
         self._hass = hass
 
         self._first_draw: bool = False
         self._region: int = _get_config_value(config_entry, CONF_REGION)
 
-        if self._dpip is None:
-            attr_name = f"{DEFAULT_NAME} {self._region} Isoseismal Map"
-        else:
-            email = _get_config_value(config_entry, CONF_EMAIL)
-            attr_name = f"{DEFAULT_NAME} {email} Isoseismal Map"
-
+        attr_name = f"{DEFAULT_NAME} {self._region} Isoseismal Map"
         self._attr_name = attr_name
         self._attr_unique_id = re.sub(r"\s+|@", "_", attr_name.lower())
         self._attr_content_type: str = "image/png"

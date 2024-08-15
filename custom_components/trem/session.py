@@ -94,6 +94,7 @@ class WebSocketConnection:
         self.earthquakeData: dict = {}
         self.rtsData: dict = {}
         self.tsunamiData: dict = []
+        self.ntpData: dict = {}
 
     async def connect(self):
         """Connect to TREM websocket..."""
@@ -164,7 +165,9 @@ class WebSocketConnection:
                         raise WebSocketError(msg)
 
                 data_type = msg_data.get("type")
-                if data_type == WebSocketEvent.VERIFY.value:
+                if data_type == WebSocketEvent.NTP.value:
+                    self.ntpData = msg_data
+                elif data_type == WebSocketEvent.VERIFY.value:
                     self._access_token = await self._fetchToken(
                         credentials=self._credentials
                     )
