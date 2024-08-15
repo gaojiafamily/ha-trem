@@ -136,7 +136,7 @@ async def validate_input(
     if CONF_NODE in user_input:
         uri: str = user_input[CONF_NODE]
         if uri.lower() == "random" or uri in BASE_URLS:
-            return True
+            return region_name if return_region else True
 
         if validators.url(uri):
             try:
