@@ -75,7 +75,7 @@ English | [繁體中文](README_zhHant.md)<br>
 ## Installation
 
 ### Using [HACS](https://hacs.xyz/) (recommended)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=J1A-T13N&repository=ha-trem&category=Integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gaojiafamily&repository=ha-trem&category=Integration)
 
 ### Manual
 1. Create `config/custom_components` folder if not existing.

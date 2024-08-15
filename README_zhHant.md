@@ -73,7 +73,7 @@
 ## 安裝方式
 
 ### 透過 [HACS](https://hacs.xyz/) (推薦)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=J1A-T13N&repository=ha-trem&category=Integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gaojiafamily&repository=ha-trem&category=Integration)
 
 ### 手動安裝
 1. 如果 `config/custom_components` 不存在，請建立該資料夾
