@@ -1,6 +1,6 @@
 <h1 align="center">Taiwan Real-time Earthquake Monitoring for HA</h1>
 
-![Logo](https://raw.githubusercontent.com/J1A-T13N/ha-trem/master/docs/media/logo.png)
+![Logo](https://raw.githubusercontent.com/gaojiafamily/ha-trem/master/docs/media/logo.png)
 
 [![GitHub Release][releases-shield]][releases]
 [![hacs_custom][hacs_custom_shield]][hacs_custom]
