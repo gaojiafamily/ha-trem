@@ -85,6 +85,7 @@ class rtsBinarySensor(BinarySensorEntity):
         """Schedule a custom update via the common entity update service."""
 
         self._attr_value = {}
+        self._attributes = {}
         self._attributes[ATTR_NODE] = self._coordinator.station
 
         rtsData: dict = self._coordinator.rtsData

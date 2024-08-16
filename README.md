@@ -19,8 +19,10 @@ English | [繁體中文](README_zhHant.md)<br>
 
 ## Screenshots
 
-![config_flow_image](https://github.com/J1A-T13N/ha-trem/assets/29163857/a6f4cc49-0521-4f27-a894-9fb1273be1cf)
-![simulator_earthquake_demo](https://github.com/J1A-T13N/ha-trem/assets/29163857/b62dab7a-2935-4477-8297-f7e275df0a81)
+![config_flow_image](https://github.com/user-attachments/assets/9d92c830-7318-4baf-add7-a07d1e2d2673)
+![simulator_earthquake_demo](https://github.com/user-attachments/assets/c05ca3a5-b0aa-4e4f-9376-59c2f31ef536)
+[Demo video](https://youtu.be/3MvTdGuDs7s)
+
 
 <hr>
 <br>
@@ -127,9 +129,13 @@ English | [繁體中文](README_zhHant.md)<br>
 
 ### Websocket
 **Exptech VIP Only**
-You can goto [https://exptech.com.tw/pricing](https://exptech.com.tw/pricing) to subscribe.
+<p>You can goto [https://exptech.com.tw/pricing](https://exptech.com.tw/pricing) to subscribe.</p>
+<br>
 
-*An API server can be monitored [here](https://status.exptech.dev/).*<br>
+*An API server can be monitored [here](https://status.exptech.dev).*
+
+<hr>
+<br>
 
 
 ## Known issues
@@ -154,9 +160,9 @@ You can goto [https://exptech.com.tw/pricing](https://exptech.com.tw/pricing) to
 
 ## Donate
 
-| Buy me a coffee | LINE Bank | JKao Pay |
+| Buy me a coffee | LINE Bank | JAKo Pay |
 | :------------: | :------------: | :------------: |
-| <img src="https://github.com/J1A-T13N/ha-trem/assets/29163857/e61afedc-1fce-47a1-a6c3-00bc1a9a5329" alt="Buy me a coffee" height="200" width="200">  | <img src="https://github.com/J1A-T13N/ha-trem/assets/29163857/a0af96ea-7e03-47de-83ae-3c11b2e27c57" alt="Line Bank" height="200" width="200">  | <img src="https://github.com/J1A-T13N/ha-trem/assets/29163857/333def56-cf08-4f8e-a188-9067cc4f63d9" alt="JKo Pay" height="200" width="200">  |
+| <img src="https://github.com/user-attachments/assets/48a3bae6-f342-4d74-ba95-8db82cb44430" alt="Buy me a coffee" height="200" width="200">  | <img src="https://github.com/user-attachments/assets/ee77e2b6-3409-43da-b2b8-14878c5660bb" alt="Line Bank" height="200" width="200">  | <img src="https://github.com/user-attachments/assets/cfaeab8f-576c-43e7-be52-8581bf263cd9" alt="JAKo Pay" height="200" width="200">  |
 
 <hr>
 <br>
