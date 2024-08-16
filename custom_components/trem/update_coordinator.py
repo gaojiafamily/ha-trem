@@ -51,7 +51,7 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         """Initialize the data object."""
 
         self._hass = hass
-        self._update_interval = update_interval
+        self._init_update_interval = update_interval
 
         self.connection: WebSocketConnection | None = None
         self.session = async_get_clientsession(hass)
@@ -79,37 +79,57 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         else:
             station, base_url = random.choice(list(BASE_URLS.items()))
         self.station: str = station
+        self._tmpStation: str | None = None
+        self._tmpUrl: str | None = None
         self._base_url: str = (
-            base_url
-            if self.plan == CUSTOMIZE_PLAN
-            else f"{base_url}/api/v1/eq/eew?type=cwa"
+            f"{base_url}/api/v1/eq/eew?type=cwa" if self.plan == FREE_PLAN else base_url
         )
-        self._protocol = "Http(s)"
+        self.protocol = "Http(s)"
         self.retry: int = 0
         self.earthquakeData: dict | list = {}
         self.rtsData: dict = {}
         self.tsunamiData: dict = {}
 
         if self.plan == SUBSCRIBE_PLAN:
-            self._protocol = "Websocket"
+            self.protocol = "Websocket"
             super().__init__(
                 hass,
                 _LOGGER,
-                name=self._protocol,
+                name=self.protocol,
                 update_method=self._async_update_websocket,
-                update_interval=self._update_interval,
+                update_interval=self._init_update_interval,
             )
         else:
             super().__init__(
                 hass,
                 _LOGGER,
-                name=self._protocol,
+                name=self.protocol,
                 update_method=self._async_update_http,
-                update_interval=self._update_interval,
+                update_interval=self._init_update_interval,
             )
 
         _LOGGER.debug(
-            f"{self._protocol}: Fetching data from {self.station}, EEW(location: {self.region}) is monitoring..."  # noqa: G004
+            f"{self.protocol}: Fetching data from {self.station}, EEW(location: {self.region}) is monitoring..."  # noqa: G004
+        )
+
+    async def _fetch_data(self, url=None) -> ClientResponse:
+        """Fetch earthquake data from the Http API."""
+
+        self.protocol = "Http(s)"
+
+        payload = {}
+        headers = {
+            ACCEPT: CONTENT_TYPE_JSON,
+            CONTENT_TYPE: CONTENT_TYPE_JSON,
+            USER_AGENT: HA_USER_AGENT,
+        }
+
+        return await self.session.request(
+            method=METH_GET,
+            url=self._base_url if url is None else url,
+            data=json.dumps(payload),
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
         )
 
     async def _async_update_http(self):
@@ -119,22 +139,8 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
             self.update_interval = timedelta(seconds=86400)
             raise UpdateFailed
 
-        response: ClientResponse | None = None
-        payload = {}
-        headers = {
-            ACCEPT: CONTENT_TYPE_JSON,
-            CONTENT_TYPE: CONTENT_TYPE_JSON,
-            USER_AGENT: HA_USER_AGENT,
-        }
-
         try:
-            response = await self.session.request(
-                method=METH_GET,
-                url=self._base_url,
-                data=json.dumps(payload),
-                headers=headers,
-                timeout=REQUEST_TIMEOUT,
-            )
+            response = await self._fetch_data()
         except ClientConnectorError as ex:
             self.retry = self.retry + 1
 
@@ -164,12 +170,18 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                 )
 
         if self.retry == 0:
-            self.update_interval = self._update_interval
+            self.update_interval = self._init_update_interval
 
         if self.retry > 0:
             self.update_interval = timedelta(seconds=60)
 
-            await self.switch_node()
+            station, base_url = await self.get_route()
+            self.station = station
+            self._base_url = base_url
+            _LOGGER.warning(
+                f"Switch Station {self.station} to {station}, Try to fetching data..."
+            )
+
             raise UpdateFailed
 
         return self
@@ -197,6 +209,9 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         else:
             isReady = self.connection.ready()
             if isReady:
+                self.retry = 0
+                self.protocol = "Websocket"
+
                 self.earthquakeData = self.connection.earthquakeData
                 self.rtsData = self.connection.rtsData
                 self.tsunamiData = self.connection.tsunamiData
@@ -209,34 +224,68 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                         "Your VIP membership has expired, Please re-subscribe.",
                     )
             else:
+                self.retry = self.retry + 1
+
                 if not self.connection.is_running:
                     self.connection = None
                     _LOGGER.warning("Reconnecting websocket...")
-                self.retry = self.retry + 1
-                raise UpdateFailed
+
+        if self.retry == 0:
+            self.update_interval = self._init_update_interval
+
+        if self.retry > 0:
+            self.update_interval = timedelta(seconds=5)
+
+            if self._tmpUrl is None:
+                station, url = await self.get_route("Http(s)")
+                self._tmpStation = station
+                self._tmpUrl = f"{url}/api/v1/eq/eew?type=cwa"
+
+            try:
+                _LOGGER.debug(
+                    f"Websocket is unavailable, Fetching data from Http(s) API({self._tmpStation})..."  # noqa: G004
+                )
+                response = await self._fetch_data(self._tmpUrl)
+            except ClientConnectorError as ex:
+                _LOGGER.error(
+                    f"Failed fetching data from Http(s) API({self._tmpStation}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
+                )
+            except TimeoutError as ex:
+                _LOGGER.error(
+                    f"Failed fetching data from Http(s) API({self._tmpStation}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
+                )
+            except Exception:
+                _LOGGER.exception(
+                    f"An unexpected exception occurred fetching the data from Http(s) API({self._tmpStation})."  # noqa: G004
+                )
+            else:
+                if response.ok:
+                    self.earthquakeData = await response.json()
+                    return self
+
+                _LOGGER.error(
+                    f"Failed fetching data from Http(s) API({self._tmpStation}), (HTTP Status Code = {response.status}). Retry {self.retry}/5..."  # noqa: G004
+                )
+
+            self._tmpUrl = None
+            raise UpdateFailed
 
         return self
 
-    async def switch_node(self) -> str | None:
-        """Switch the Http(s) api node for fetching earthquake data."""
+    async def get_route(self, protocol="Websocket"):
+        """Random the node for fetching data."""
 
         if self.plan == CUSTOMIZE_PLAN:
             return None
 
-        tmpStations: dict = BASE_URLS.items()
-        if self.plan == SUBSCRIBE_PLAN:
+        tmpStations = BASE_URLS.items()
+        if self.plan == SUBSCRIBE_PLAN and protocol == "Websocket":
             tmpStations = BASE_WS.items()
-        tmpStations.pop(self.station)
+        tmpStations = {
+            k: v for k, v in tmpStations if k != self.station
+        }  # tmpStations.pop(self.station)
 
-        station, base_url = random.choice(list(tmpStations))
-        self.station = station
-        self._base_url = base_url
-
-        _LOGGER.warning(
-            f"Switch Station {self.station} to {station}, Try to fetching data..."
-        )
-
-        return station
+        return random.choice(list(tmpStations.items()))
 
 
 async def _notify_message(

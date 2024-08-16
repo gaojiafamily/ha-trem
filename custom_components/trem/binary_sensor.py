@@ -7,7 +7,10 @@ from datetime import timedelta
 import logging
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ATTRIBUTION, CONF_EMAIL
 from homeassistant.core import HomeAssistant, callback
@@ -18,7 +21,6 @@ from .const import (
     ATTRIBUTION,
     DOMAIN,
     MANUFACTURER,
-    MONITOR_ICON,
     TREM_COORDINATOR,
     TREM_NAME,
 )
@@ -82,14 +84,13 @@ class rtsBinarySensor(BinarySensorEntity):
     def update(self):
         """Schedule a custom update via the common entity update service."""
 
+        self._attr_value = {}
         self._attributes[ATTR_NODE] = self._coordinator.station
 
         rtsData: dict = self._coordinator.rtsData
         if "int" in rtsData:
             rts: list = rtsData["int"]
-            if len(rts) == 0:
-                self._attr_value = {}
-            else:
+            if len(rts) > 0:
                 for k in rts:
                     self._attr_value[k["code"]] = k["i"]
 
@@ -116,22 +117,22 @@ class rtsBinarySensor(BinarySensorEntity):
         return True
 
     @property
-    def state(self) -> bool:
+    def is_on(self) -> bool:
         """Return the state of the sensor."""
 
         return self._state
-
-    @property
-    def icon(self) -> str:
-        """Icon to use in the frontend, if any."""
-
-        return MONITOR_ICON
 
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
 
         return None
+
+    @property
+    def device_class(self):
+        """Return the device class."""
+
+        return BinarySensorDeviceClass.VIBRATION
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

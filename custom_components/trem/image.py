@@ -13,7 +13,7 @@ from PIL import Image
 
 from homeassistant.components.image import ImageEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_ATTRIBUTION, CONF_EMAIL, CONF_REGION
+from homeassistant.const import ATTR_ATTRIBUTION, CONF_REGION
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt as dt_util

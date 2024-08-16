@@ -26,6 +26,7 @@ from .const import (
     ATTR_LOC,
     ATTR_MAG,
     ATTR_NODE,
+    ATTR_PROTOCOL,
     ATTR_TIME,
     ATTRIBUTION,
     CONF_DRAW_MAP,
@@ -199,8 +200,9 @@ class earthquakeSensor(SensorEntity):
         else:
             self._attr_value[ATTR_EST] = 0
 
-        self._attr_value[ATTR_CODE] = self._name
+        self._attributes[ATTR_PROTOCOL] = self._coordinator.protocol
         self._attributes[ATTR_NODE] = self._coordinator.station
+        self._attributes[ATTR_CODE] = self._name
 
         if not self._preserve_data:
             self._attr_value = {}
