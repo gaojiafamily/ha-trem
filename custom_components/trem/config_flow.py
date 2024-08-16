@@ -136,7 +136,7 @@ async def validate_input(
     if CONF_NODE in user_input:
         uri: str = user_input[CONF_NODE]
         if uri.lower() == "random" or uri in BASE_URLS:
-            return True
+            return region_name if return_region else True
 
         if validators.url(uri):
             try:
@@ -181,7 +181,6 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
-        self._token: str | None = None
         self._preserve_data: bool | None = None
         self._draw_map: bool | None = None
 
@@ -291,7 +290,6 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
         self._email = user_input.get(CONF_EMAIL, "")
         self._password = user_input.get(CONF_PASSWORD, "")
         self._region = user_input.get(CONF_REGION, None)
-        # self._token = user_input.get(CONF_TOKEN, "")
         self._preserve_data = user_input.get(CONF_PRESERVE_DATA, False)
         self._draw_map = user_input.get(CONF_DRAW_MAP, False)
 
@@ -300,7 +298,6 @@ class tremFlowHandler(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_EMAIL, default=self._email): str,
                 vol.Required(CONF_PASSWORD, default=self._password): str,
                 vol.Required(CONF_REGION, default=self._region): int,
-                # vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }
@@ -324,7 +321,6 @@ class OptionsFlowHandler(OptionsFlow):
         self._node: str | None = None
         self._email: str | None = None
         self._password: str | None = None
-        self._token: str | None = None
         self._preserve_data: bool | None = None
         self._draw_map: bool | None = None
 
@@ -416,7 +412,6 @@ class OptionsFlowHandler(OptionsFlow):
         self._region = self._config.options.get(CONF_REGION, None)
         self._email = self._config.options.get(CONF_EMAIL, "")
         self._password = self._config.options.get(CONF_PASSWORD, "")
-        self._token = self._config.options.get(CONF_TOKEN, "")
         self._preserve_data = self._config.options.get(CONF_PRESERVE_DATA, False)
         self._draw_map = self._config.options.get(CONF_DRAW_MAP, False)
 
@@ -424,7 +419,6 @@ class OptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_EMAIL, default=self._email): str,
                 vol.Optional(CONF_PASSWORD, default=self._password): str,
-                # vol.Optional(CONF_TOKEN, default=self._token): str,
                 vol.Optional(CONF_PRESERVE_DATA, default=self._preserve_data): bool,
                 vol.Optional(CONF_DRAW_MAP, default=self._draw_map): bool,
             }

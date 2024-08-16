@@ -34,6 +34,17 @@
 <br>
 
 
+## Feature
+
+- [x] Isoseismal map image (can also be saved as file).
+- [x] Simulator earthquake service.
+- [x] RTS Notification (Exptech VIP Only).
+- [x] Tsunami Notification (Exptech VIP Only).
+
+<hr>
+<br>
+
+
 ## 測試結果
 
 | 環境 | Home Assistant OS | Home Assistant Core | Home Assistant Supervisor |
@@ -84,14 +95,23 @@
 
 
 ## 設定
+
 **請跟隨設定流程新增.**
 
+1. 配置 > 整合 > 新增整合 > Taiwan Real-time Earthquake Monitoring
+ - 如果整合未顯示在清單中，請重新整理頁面
+ - 如果整合仍然不在清單中，您需要清除瀏覽器快取。
+
+*地區代碼可以[到這](https://github.com/ExpTechTW/API/blob/master/resource/region.json) 查詢*<br>
 <hr>
 <br>
 
 
-## API 節點
+## 資料來源
+- [x] HTTPS API (or use your self-server)
+- [x] Websocket. (Exptech VIP Only)
 
+### HTTPS API
 | Node               | Description      |
 | :----------------: | :--------------: |
 | tainan_cache_limit | 請求次數遭到限制　 |
@@ -105,12 +125,16 @@
 | pingtung           | 即時資料，但延遲高 |
 | pingtung_2         | 即時資料，但延遲高 |
 
-*An API server can be monitored [here](https://status.exptech.dev/).*<br>
+### Websocket
+**需要Exptech VIP**
+您可以到 [https://exptech.com.tw/pricing](https://exptech.com.tw/pricing) 訂閱VIP
+
+*伺服器狀態可 [在這](https://status.exptech.dev/) 查看*<br>
 
 
 ## 已知問題
 
-> :tada: 暫時沒有發現問題
+1. 暫不支援 2024.8 及更高版本的 Home Assistant
 
 <hr>
 <br>
@@ -128,20 +152,6 @@
 <br>
 
 
-## 未來功能
-
-- [x] Integration 相關: Convert components from sensor to platform.
-- [x] Integration 功能: 新增等震圖.
-- [x] Integration 功能: 模擬地震 (用於測試自動化)。
-- [x] Integration 服務: 另存等震圖.
-- [x] Integration 服務: 重新載入整合.
-- [x] ExptechTW 訂閱功能: 使用WebSocket作為地震速報來源，減少流量及延遲。 (Exptech VIP 資格)
-- [ ] ExptechTW 訂閱功能: TREM-Net EEW、RTS...等。 (Exptech VIP 資格)
-
-<hr>
-<br>
-
-
 ## 贊助
 
 | Buy me a coffee | LINE Bank | JKao Pay |
@@ -153,7 +163,9 @@
 
 
 ## 授權
-AGPL-3.0 license
+AGPL-3.0 license.
+
+**2024-08-15 Agreement reached with ExpTech Studio.**
 
 
 [releases-shield]: https://img.shields.io/github/release/gaojiafamily/ha-trem.svg?style=for-the-badge

@@ -5,21 +5,20 @@ from datetime import timedelta
 # Initialize
 DEFAULT_NAME = "TREM"
 DEFAULT_ICON = "mdi:checkbox-blank-outline"
-MONITOR_ICON = "mdi:monitor-eye"
 TSUNAMI_ICON = "mdi:tsunami"
 DOMAIN = "trem"
 PLATFORMS = ["binary_sensor", "image", "sensor"]
 
 # Proj
 CLIENT_NAME = "TREM-HA"
-PROJECT_URL = "https://github.com/J1A-T13N/ha-trem/"
+PROJECT_URL = "https://github.com/gaojiafamily/ha-trem/"
 ISSUE_URL = f"{PROJECT_URL}issues"
 
 # Version
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.3.2"
+__version__ = "1.3.3"
 
 # Earthquake Icon
 EARTHQUAKE_ICON = {
@@ -50,6 +49,7 @@ ATTR_INT = "intensity"
 ATTR_EST = "estimate"
 ATTR_CODE = "region"
 ATTR_NODE = "API_Node"
+ATTR_PROTOCOL = "protocol"
 ATTR_EQDATA = "earthquake_data"
 EARTHQUAKE_ATTR = [
     ATTR_ID,
@@ -62,7 +62,6 @@ EARTHQUAKE_ATTR = [
     ATTR_TIME,
     ATTR_INT,
     ATTR_EST,
-    ATTR_CODE,
 ]
 TSUNAMI_ATTR = [
     ATTR_ID,
@@ -77,18 +76,14 @@ CONF_PASS = "pass"
 CONF_PRESERVE_DATA = "preserve_data"
 
 # Coordinator
-DPIP_COORDINATOR = "dpip_coordinator"
 TREM_COORDINATOR = "trem_coordinator"
 TREM_NAME = "trem_name"
 UPDATE_LISTENER = "update_listener"
 HTTPS_API_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=5)
 WEBSOCKET_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=1)
-DPIP_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=60)
 
 # REST
-HA_USER_AGENT = (
-    "TREM custom integration for Home Assistant (https://github.com/j1a-t13n/ha-trem)"
-)
+HA_USER_AGENT = "TREM custom integration for Home Assistant (https://github.com/gaojiafamily/ha-trem)"
 BASE_URLS = {
     "tainan_cache_limit": "https://api-1.exptech.com.tw",
     "tainan_cache": "https://api-1.exptech.dev",
@@ -117,7 +112,7 @@ DEFAULT_MAX_MSG_SIZE = 16 * 1024 * 1024
 # STRINGS
 CUSTOMIZE_PLAN = "Customize (Free Plan)"
 FREE_PLAN = "Http(s) API (Free Plan)"
-SUBSCRIBE_PLAN = "WebSocket (Subscribe Plan)"
+SUBSCRIBE_PLAN = "Websocket (Subscribe Plan)"
 
 WS_MSG_TOO_BIG = (
     f"Please consider increasing message size with `{DEFAULT_MAX_MSG_SIZE}`."

@@ -22,7 +22,6 @@ English | [繁體中文](README_zhHant.md)<br>
 ![config_flow_image](https://github.com/J1A-T13N/ha-trem/assets/29163857/a6f4cc49-0521-4f27-a894-9fb1273be1cf)
 ![simulator_earthquake_demo](https://github.com/J1A-T13N/ha-trem/assets/29163857/b62dab7a-2935-4477-8297-f7e275df0a81)
 
-
 <hr>
 <br>
 
@@ -31,6 +30,16 @@ English | [繁體中文](README_zhHant.md)<br>
 >The source of earthquake early warning is provided by ExpTech Studio and is for reference only.<br>
 >The actual results are subject to the content published by [CWA](https://scweb.cwa.gov.tw/en-US).
 
+<hr>
+<br>
+
+
+## Feature
+
+- [x] Isoseismal map image (can also be saved as file).
+- [x] Simulator earthquake service.
+- [x] RTS Notification (Exptech VIP Only).
+- [x] Tsunami Notification (Exptech VIP Only).
 
 <hr>
 <br>
@@ -93,12 +102,16 @@ English | [繁體中文](README_zhHant.md)<br>
    - If the integration didn't show up in the list please REFRESH the page
    - If the integration is still not in the list, you need to clear the browser cache.
 
+*A Region code can be search [here](https://github.com/ExpTechTW/API/blob/master/resource/region.json).*<br>
 <hr>
 <br>
 
 
-## API Node
+## Data Source
+- [x] HTTPS API (or use your self-server)
+- [x] Websocket. (Exptech VIP Only)
 
+### HTTPS API
 | Node               | Description                                 |
 | :----------------: | :-----------------------------------------: |
 | tainan_cache_limit | The number of requests is limited           |
@@ -112,12 +125,16 @@ English | [繁體中文](README_zhHant.md)<br>
 | pingtung           | The data is real-time but the load is high  |
 | pingtung_2         | The data is real-time but the load is high  |
 
+### Websocket
+**Exptech VIP Only**
+You can goto [https://exptech.com.tw/pricing](https://exptech.com.tw/pricing) to subscribe.
+
 *An API server can be monitored [here](https://status.exptech.dev/).*<br>
 
 
 ## Known issues
 
-> :tada: No issues found yet
+1. Not support Home Assistant 2024.8 and higher yet.
 
 <hr>
 <br>
@@ -125,25 +142,11 @@ English | [繁體中文](README_zhHant.md)<br>
 
 ## Contribution
 
-- ExpTech Studio `EEW Source`
+- ExpTech Studio `Data Source`
 - watermelon1024 `Contributor`
 - kukuxx `Test Partner`
 
 <p>I would like to thank everyone who has helped me and every partner in the community for their generous help.</p>
-
-<hr>
-<br>
-
-
-## Future
-
-- [x] Integration: Convert components from sensor to platform.
-- [x] Integration: Add isoseismal map image.
-- [x] Integration Service: Simulator earthquake.
-- [x] Integration Service: Save as image.
-- [x] Integration Service: Reload entity.
-- [x] ExptechTW Features: Earthquake early warning Source from WebSocket. (Exptech VIP Only)
-- [ ] ExptechTW Features: TREM-Net EEW、RTS...etc. (Exptech VIP Only)
 
 <hr>
 <br>
@@ -161,6 +164,8 @@ English | [繁體中文](README_zhHant.md)<br>
 
 ## License
 AGPL-3.0 license
+
+**2024-08-15 Agreement reached with ExpTech Studio.**
 
 
 [releases-shield]: https://img.shields.io/github/release/gaojiafamily/ha-trem.svg?style=for-the-badge

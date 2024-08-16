@@ -23,7 +23,6 @@ from .const import (
     CLIENT_NAME,
     CONF_NODE,
     CONF_PASS,
-    DEFAULT_NAME,
     DOMAIN,
     HTTPS_API_COORDINATOR_UPDATE_INTERVAL,
     MIN_HA_MAJ_VER,
