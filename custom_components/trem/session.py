@@ -90,6 +90,8 @@ class WebSocketConnection:
             WebSocketService.EEW.value,
             WebSocketService.TSUNAMI.value,
             WebSocketService.REALTIME_STATION.value,
+            WebSocketService.CWA_INTENSITY.value,
+            WebSocketService.TREM_INTENSITY.value,
         ]
         self.earthquakeData: dict = {}
         self.rtsData: dict = {}
@@ -184,17 +186,18 @@ class WebSocketConnection:
                     data: dict = msg_data.get("data")
                     eventType: dict = data.get("type")
 
-                    if eventType == WebSocketEvent.EEW.value:
-                        _LOGGER.debug("recv: %s", msg_data)
-                        if msg_data["author"] == "cwa":
-                            self.earthquakeData = data.get("data")
-
                     if eventType == WebSocketEvent.RTS.value:
                         self.rtsData = data.get("data")
+                    else:
+                        _LOGGER.info("recv: %s", msg_data)
+
+                    if eventType == WebSocketEvent.EEW.value:
+                        if data.get("author", None) == "cwa":
+                            self.earthquakeData = data
 
                     if eventType == WebSocketEvent.TSUNAMI.value:
-                        if msg_data["author"] == "cwa":
-                            self.tsunamiData = data.get("data")
+                        if data.get("author", None) == "cwa":
+                            self.tsunamiData = data
             except ConnectionResetError:
                 await self.close()
                 raise WebSocketClosure  # noqa: B904
