@@ -32,7 +32,7 @@ from .const import (
     REQUEST_TIMEOUT,
     SUBSCRIBE_PLAN,
 )
-from .exceptions import WebSocketClosure
+from .exceptions import UnknownError, WebSocketClosure
 from .session import WebSocketConnection
 
 _LOGGER = logging.getLogger(__name__)
@@ -202,6 +202,9 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
             except WebSocketError:
                 _LOGGER.error("Websocket connection had an error.")
 
+            except UnknownError:
+                _LOGGER.error("An unexpected error occurred.")
+
             except Exception:
                 _LOGGER.exception(
                     "An unexpected exception occurred on the websocket client."
@@ -242,7 +245,7 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                 self._tmpUrl = f"{url}/api/v1/eq/eew?type=cwa"
 
             try:
-                _LOGGER.debug(
+                _LOGGER.warning(
                     f"Websocket is unavailable, Fetching data from Http(s) API({self._tmpStation})..."  # noqa: G004
                 )
                 response = await self._fetch_data(self._tmpUrl)
