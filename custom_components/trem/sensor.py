@@ -125,24 +125,22 @@ class earthquakeSensor(SensorEntity):
     def update(self):
         """Schedule a custom update via the common entity update service."""
 
-        data: dict = {}
-        if isinstance(self._coordinator.earthquakeData, dict):
-            data = self._coordinator.earthquakeData
+        eew: EEW | None = None
+        data = self._coordinator.earthquakeData
 
-        if len(data) > 0:
+        if isinstance(data, list) and len(data) > 0:
             self.simulator = None
+
+            eew = EEW.from_dict(data[0])
         elif isinstance(self.simulator, dict):
-            data = self.simulator
             if self.simulatorTime is None:
                 self.simulatorTime = datetime.now()
+
+            eew = EEW.from_dict(self.simulator)
 
             time = datetime.now() - self.simulatorTime
             if time.total_seconds() >= 240:
                 self.simulator = None
-
-        eew: EEW | None = None
-        if "id" in data:
-            eew = EEW.from_dict(data)
 
         if isinstance(eew, EEW):
             earthquakeSerial = f"{eew.id} (Serial {eew.serial})"
