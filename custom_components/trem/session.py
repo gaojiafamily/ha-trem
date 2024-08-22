@@ -193,7 +193,10 @@ class WebSocketConnection:
 
                     if eventType == WebSocketEvent.EEW.value:
                         if data.get("author", None) == "cwa":
-                            self.earthquakeData = data
+                            msgTime = msg_data.get("time", 0)
+                            tmpData: dict = data
+                            tmpData["time"] = data.get("time", msgTime)
+                            self.earthquakeData = [tmpData]
 
                     if eventType == WebSocketEvent.TSUNAMI.value:
                         if data.get("author", None) == "cwa":
