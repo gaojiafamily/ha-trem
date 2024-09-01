@@ -16,14 +16,7 @@ from homeassistant.const import ATTR_ATTRIBUTION, CONF_EMAIL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import (
-    ATTR_NODE,
-    ATTRIBUTION,
-    DOMAIN,
-    MANUFACTURER,
-    TREM_COORDINATOR,
-    TREM_NAME,
-)
+from .const import ATTRIBUTION, DOMAIN, MANUFACTURER, TREM_COORDINATOR, TREM_NAME
 from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,20 +77,18 @@ class rtsBinarySensor(BinarySensorEntity):
     def update(self):
         """Schedule a custom update via the common entity update service."""
 
-        self._attr_value = {}
         self._attributes = {}
-        self._attributes[ATTR_NODE] = self._coordinator.station
 
         rtsData: dict = self._coordinator.rtsData
-        if "int" in rtsData:
-            rts: list = rtsData["int"]
-            if len(rts) > 0:
-                for k in rts:
-                    self._attr_value[k["code"]] = k["i"]
+        rts: list = rtsData.get("int", [])
+        if len(rts) > 0:
+            for k in rts:
+                self._attr_value[k["code"]] = k["i"]
 
-                self._state = True
-                return self
+            self._state = True
+            return self
 
+        self._attr_value = {}
         self._state = False
         return self
 
