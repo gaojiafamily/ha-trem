@@ -26,6 +26,7 @@ from .const import (
     ATTR_LOC,
     ATTR_MAG,
     ATTR_NODE,
+    ATTR_OFFSET,
     ATTR_PROTOCOL,
     ATTR_TIME,
     ATTRIBUTION,
@@ -193,21 +194,51 @@ class earthquakeSensor(SensorEntity):
                 earthquake.map.draw()
                 waveSec = datetime.now() - earthquake.time
                 earthquake.map.draw_wave(time=waveSec.total_seconds())
+
                 self._coordinator.map = earthquake.map.save()
                 self._coordinator.mapSerial = earthquakeSerial
         else:
             self._attr_value[ATTR_EST] = 0
 
-        self._attributes[ATTR_PROTOCOL] = self._coordinator.protocol
-        self._attributes[ATTR_NODE] = self._coordinator.station
-        self._attributes[ATTR_CODE] = self._name
+        intensity = self._coordinator.intensity
+        intAuthor = intensity.get("author", False)
+        intDrawID = intensity.get("id", "")
+        if self._draw_map and intAuthor:
+            intSerial = intensity.get("serial", "0")
+            mapSerial = f"{intAuthor}-{intDrawID} (Serial {intSerial})"
 
-        if not self._preserve_data:
-            self._attr_value = {}
-            for i in EARTHQUAKE_ATTR:
-                self._attr_value[i] = ""
-            self._icon = DEFAULT_ICON
-            self._state = ""
+            if self._coordinator.mapSerial != mapSerial:
+                earthquake = self._eew.earthquake
+                intensityArea = intensity.get("area", {})
+                for k in intensityArea:
+                    for v in intensityArea[k]:
+                        earthquake._expected_intensity[v] = k
+                earthquake.map.draw()
+
+                self._coordinator.map = earthquake.map.save()
+                self._coordinator.mapSerial = mapSerial
+
+        # Always display
+        self._attr_value[ATTR_CODE] = self._name
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            self._attr_value[ATTR_NODE] = self._coordinator.station
+            self._attr_value[ATTR_PROTOCOL] = self._coordinator.protocol
+
+            timeOffset = self._coordinator.timeOffset
+            offset = "2+s"
+            if timeOffset is not None and timeOffset < 2:
+                offset = f"{timeOffset:.2f}s"
+
+            self._attr_value[ATTR_OFFSET] = offset
+
+        if self._preserve_data:
+            return self
+
+        # Clear earthquake data
+        for i in EARTHQUAKE_ATTR:
+            self._attr_value[i] = ""
+        self._icon = DEFAULT_ICON
+        self._state = ""
 
         return self
 
@@ -295,16 +326,11 @@ class tsunamiSensor(SensorEntity):
         for i in TSUNAMI_ATTR:
             self._attr_value[i] = ""
 
-    def update(self) -> None:
+    def update(self):
         """Schedule a custom update via the common entity update service."""
-        data: dict | None = None
-        if isinstance(self._coordinator.tsunamiData, dict):
-            data = self._coordinator.tsunamiData
 
-        if data is not None and "id" in data:
-            tsunami = self._coordinator.tsunamiData
-
-            tsunamiSerial = f"{tsunami["id"]} (Serial {tsunami["serial"]})"
+        tsunami = self._coordinator.tsunamiData
+        if tsunami.get("id", False):
             if self._tsunami is None:
                 self._tsunami = tsunami
                 old_tsunamiSerial = ""
@@ -314,23 +340,23 @@ class tsunamiSensor(SensorEntity):
                     f"{old_tsunami["id"]} (Serial {old_tsunami["serial"]})"
                 )
 
+            tsunamiSerial = f"{tsunami["id"]} (Serial {tsunami["serial"]})"
             if tsunamiSerial != old_tsunamiSerial:
                 self._tsunami = tsunami
-                message = tsunami["content"]
 
-                self._state = message
-                self._attr_value[ATTR_AUTHOR] = tsunami["author"]
+                self._attr_value[ATTR_AUTHOR] = tsunami.get("author", "MISSING")
                 self._attr_value[ATTR_ID] = tsunamiSerial
-
-        self._attr_value[ATTR_NODE] = self._coordinator.station
+                self._state = tsunami.get("content", "MISSING")
 
         if self._preserve_data:
-            return
+            return self
 
-        self._attr_value = {}
+        # Clear tsunami data
         for i in TSUNAMI_ATTR:
             self._attr_value[i] = ""
         self._state = ""
+
+        return self
 
     async def async_added_to_hass(self) -> None:
         """Run when this Entity has been added to HA."""

@@ -8,6 +8,7 @@ from io import BytesIO
 import json
 import logging
 import random
+import time
 
 from aiohttp import ClientResponse, WebSocketError
 from aiohttp.client_exceptions import ClientConnectorError
@@ -84,9 +85,14 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         self._base_url: str = (
             f"{base_url}/api/v1/eq/eew?type=cwa" if self.plan == FREE_PLAN else base_url
         )
+
+        self.start = time.time()
+        self.timeOffset: float | None = None
         self.protocol = "Http(s)"
         self.retry: int = 0
-        self.earthquakeData: dict | list = {}
+
+        self.earthquakeData: list = []
+        self.intensity: dict = {}
         self.rtsData: dict = {}
         self.tsunamiData: dict = {}
 
@@ -116,6 +122,7 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         """Fetch earthquake data from the Http API."""
 
         self.protocol = "Http(s)"
+        self.start = time.time()
 
         payload = {}
         headers = {
@@ -124,13 +131,16 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
             USER_AGENT: HA_USER_AGENT,
         }
 
-        return await self.session.request(
+        resp = await self.session.request(
             method=METH_GET,
             url=self._base_url if url is None else url,
             data=json.dumps(payload),
             headers=headers,
             timeout=REQUEST_TIMEOUT,
         )
+
+        self.timeOffset = time.time() - self.start
+        return resp
 
     async def _async_update_http(self):
         """Poll earthquake data from Http(s) api."""
@@ -216,6 +226,7 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                 self.protocol = "Websocket"
 
                 self.earthquakeData = self.connection.earthquakeData
+                self.intensity = self.connection.intensity
                 self.rtsData = self.connection.rtsData
                 self.tsunamiData = self.connection.tsunamiData
 
@@ -226,6 +237,9 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
                         CLIENT_NAME,
                         "Your VIP membership has expired, Please re-subscribe.",
                     )
+                    return self
+
+                self.timeOffset = time.time() - self.connection.start
             else:
                 self.retry = self.retry + 1
 

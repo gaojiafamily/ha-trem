@@ -6,6 +6,7 @@ import asyncio
 from enum import Enum
 import json
 import logging
+import time
 
 from aiohttp import ClientWebSocketResponse, WebSocketError, WSMsgType
 from aiohttp.client_exceptions import (
@@ -52,6 +53,7 @@ class WebSocketEvent(Enum):
     CLOSE = "close"
     ERROR = "error"
     TSUNAMI = "tsunami"
+    INTENSITY = "intensity"
 
 
 class WebSocketService(Enum):
@@ -93,10 +95,12 @@ class WebSocketConnection:
             WebSocketService.CWA_INTENSITY.value,
             WebSocketService.TREM_INTENSITY.value,
         ]
-        self.earthquakeData: dict = {}
+        self.earthquakeData: list = []
+        self.intensity: dict = {}
         self.rtsData: dict = {}
-        self.tsunamiData: dict = []
-        self.ntpData: dict = {}
+        self.tsunamiData: dict = {}
+
+        self.start = time.time()
 
     async def connect(self):
         """Connect to TREM websocket..."""
@@ -147,6 +151,7 @@ class WebSocketConnection:
     async def _recv(self):
         while self.connected:
             try:
+                self.start = time.time()
                 msg = await self._connection.receive()
                 if msg:
                     msg_data: dict = json.loads(msg.data)
@@ -164,12 +169,10 @@ class WebSocketConnection:
                 if msg_type == WSMsgType.ERROR:
                     handle_error = await self._handle_error(msg_data)
                     if not handle_error:
-                        raise WebSocketError(msg)
+                        raise WebSocketError
 
                 data_type = msg_data.get("type")
-                if data_type == WebSocketEvent.NTP.value:
-                    self.ntpData = msg_data
-                elif data_type == WebSocketEvent.VERIFY.value:
+                if data_type == WebSocketEvent.VERIFY.value:
                     self._access_token = await self._fetchToken(
                         credentials=self._credentials
                     )
@@ -188,8 +191,11 @@ class WebSocketConnection:
 
                     if eventType == WebSocketEvent.RTS.value:
                         self.rtsData = data.get("data")
-                    else:
+                    elif _LOGGER.isEnabledFor(logging.DEBUG):
                         _LOGGER.info("recv: %s", msg_data)
+
+                    if eventType == WebSocketEvent.INTENSITY.value:
+                        self.intensity = data
 
                     if eventType == WebSocketEvent.EEW.value:
                         if data.get("author", None) == "cwa":
@@ -200,7 +206,10 @@ class WebSocketConnection:
 
                     if eventType == WebSocketEvent.TSUNAMI.value:
                         if data.get("author", None) == "cwa":
-                            self.tsunamiData = data
+                            msgTime = msg_data.get("time", 0)
+                            tmpData: dict = data
+                            tmpData["time"] = data.get("time", msgTime)
+                            self.tsunamiData = tmpData
             except ConnectionResetError:
                 await self.close()
                 raise WebSocketClosure  # noqa: B904
