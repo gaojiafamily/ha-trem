@@ -50,6 +50,7 @@ ATTR_EST = "estimate"
 ATTR_CODE = "region"
 ATTR_NODE = "API_Node"
 ATTR_PROTOCOL = "protocol"
+ATTR_OFFSET = "offset"
 ATTR_EQDATA = "earthquake_data"
 EARTHQUAKE_ATTR = [
     ATTR_ID,
