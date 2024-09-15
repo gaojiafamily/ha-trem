@@ -32,12 +32,14 @@ from .const import (
     ATTRIBUTION,
     CONF_DRAW_MAP,
     CONF_PRESERVE_DATA,
+    CONNECTION_MSG,
     DEFAULT_ICON,
     DEFAULT_NAME,
     DOMAIN,
     EARTHQUAKE_ATTR,
     EARTHQUAKE_ICON,
     MANUFACTURER,
+    PLAN_NAME,
     TREM_COORDINATOR,
     TREM_NAME,
     TSUNAMI_ATTR,
@@ -96,7 +98,6 @@ class earthquakeSensor(SensorEntity):
         self._hass = hass
         self._name = name
 
-        self._eew: EEW | None = None
         self.simulator: dict | None = None
         self.simulatorTime: datetime | None = None
 
@@ -113,7 +114,7 @@ class earthquakeSensor(SensorEntity):
             identifiers={(DOMAIN, config_entry.entry_id)},
             name=self._name,
             manufacturer=MANUFACTURER,
-            model=self._coordinator.plan,
+            model=PLAN_NAME[self._coordinator.plan],
         )
 
         self._attributes = {}
@@ -145,11 +146,11 @@ class earthquakeSensor(SensorEntity):
 
         if isinstance(eew, EEW):
             earthquakeSerial = f"{eew.id} (Serial {eew.serial})"
-            if self._eew is None:
-                self._eew = eew
+            if self._coordinator.eew is None:
+                self._coordinator.eew = eew
                 old_earthquakeSerial = ""
             else:
-                old_eew = self._eew
+                old_eew = self._coordinator.eew
                 old_earthquakeSerial = f"{old_eew.id} (Serial {old_eew.serial})"
 
             earthquake = eew.earthquake
@@ -158,7 +159,7 @@ class earthquakeSensor(SensorEntity):
             ).get(self._region)
 
             if earthquakeSerial != old_earthquakeSerial:
-                self._eew = eew
+                self._coordinator.eew = eew
 
                 tz_TW = timezone(timedelta(hours=8))
                 earthquakeTime = earthquake.time.astimezone(tz_TW).strftime(
@@ -169,8 +170,8 @@ class earthquakeSensor(SensorEntity):
                 )
                 earthquakeLocation = f"{earthquake.location.display_name} ({earthquake.lon:.2f}, {earthquake.lat:.2f})"
 
-                intensity = earthquakeForecast.intensity.value
-                self._attr_value[ATTR_INT] = intensity
+                intensity = earthquakeForecast.intensity
+                self._attr_value[ATTR_INT] = intensity.value
                 self._attr_value[ATTR_AUTHOR] = earthquakeProvider
                 self._attr_value[ATTR_ID] = earthquakeSerial
                 self._attr_value[ATTR_LOC] = earthquakeLocation
@@ -179,57 +180,27 @@ class earthquakeSensor(SensorEntity):
                 self._attr_value[ATTR_MAG] = earthquake.mag
                 self._attr_value[ATTR_DEPTH] = earthquake.depth
                 self._attr_value[ATTR_TIME] = earthquakeTime
-                self._icon = EARTHQUAKE_ICON[intensity]
-                self._state = earthquakeForecast.intensity
+                self._state = intensity
+                self._icon = EARTHQUAKE_ICON[intensity.value]
 
             earthquakeEst = int(
                 earthquakeForecast.distance.s_left_time().total_seconds()
             )
             self._attr_value[ATTR_EST] = earthquakeEst if earthquakeEst > 0 else 0
-
-            if self._draw_map:
-                earthquake._expected_intensity = {
-                    self._region: earthquake._expected_intensity.get(self._region)
-                }
-                earthquake.map.draw()
-                waveSec = datetime.now() - earthquake.time
-                earthquake.map.draw_wave(time=waveSec.total_seconds())
-
-                self._coordinator.map = earthquake.map.save()
-                self._coordinator.mapSerial = earthquakeSerial
         else:
             self._attr_value[ATTR_EST] = 0
-
-        intensity = self._coordinator.intensity
-        intAuthor = intensity.get("author", False)
-        intDrawID = intensity.get("id", "")
-        if self._draw_map and intAuthor:
-            intSerial = intensity.get("serial", "0")
-            mapSerial = f"{intAuthor}-{intDrawID} (Serial {intSerial})"
-
-            if self._coordinator.mapSerial != mapSerial:
-                earthquake = self._eew.earthquake
-                intensityArea = intensity.get("area", {})
-                for k in intensityArea:
-                    for v in intensityArea[k]:
-                        earthquake._expected_intensity[v] = k
-                earthquake.map.draw()
-
-                self._coordinator.map = earthquake.map.save()
-                self._coordinator.mapSerial = mapSerial
 
         # Always display
         self._attr_value[ATTR_CODE] = self._name
         if _LOGGER.isEnabledFor(logging.DEBUG):
+            timestamp = datetime.timestamp(datetime.now()) * 1000
+            offsetTime: float = (timestamp - self._coordinator.recvTime) / 1000
+
             self._attr_value[ATTR_NODE] = self._coordinator.station
-            self._attr_value[ATTR_PROTOCOL] = self._coordinator.protocol
-
-            timeOffset = self._coordinator.timeOffset
-            offset = "2+s"
-            if timeOffset is not None and timeOffset < 2:
-                offset = f"{timeOffset:.2f}s"
-
-            self._attr_value[ATTR_OFFSET] = offset
+            self._attr_value[ATTR_OFFSET] = (
+                f"{offsetTime:.2f}s" if offsetTime < 2 else "2s+"
+            )
+            self._attr_value[ATTR_PROTOCOL] = CONNECTION_MSG[self._coordinator.status]
 
         if self._preserve_data:
             return self
@@ -317,7 +288,7 @@ class tsunamiSensor(SensorEntity):
             identifiers={(DOMAIN, config.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
-            model=self._coordinator.plan,
+            model=PLAN_NAME[self._coordinator.plan],
         )
 
         self._state = ""

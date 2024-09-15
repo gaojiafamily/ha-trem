@@ -16,7 +16,14 @@ from homeassistant.const import ATTR_ATTRIBUTION, CONF_EMAIL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import ATTRIBUTION, DOMAIN, MANUFACTURER, TREM_COORDINATOR, TREM_NAME
+from .const import (
+    ATTRIBUTION,
+    DOMAIN,
+    MANUFACTURER,
+    PLAN_NAME,
+    TREM_COORDINATOR,
+    TREM_NAME,
+)
 from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,7 +74,7 @@ class rtsBinarySensor(BinarySensorEntity):
             identifiers={(DOMAIN, config_entry.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
-            model=self._coordinator.plan,
+            model=PLAN_NAME[self._coordinator.plan],
         )
 
         self._state: bool = False
@@ -79,17 +86,20 @@ class rtsBinarySensor(BinarySensorEntity):
 
         self._attributes = {}
 
-        rtsData: dict = self._coordinator.rtsData
+        rtsData = self._coordinator.rtsData
         rts: list = rtsData.get("int", [])
         if len(rts) > 0:
             for k in rts:
                 self._attr_value[k["code"]] = k["i"]
 
             self._state = True
+            self._attr_value = rtsData
+
             return self
 
         self._attr_value = {}
         self._state = False
+
         return self
 
     async def async_added_to_hass(self) -> None:

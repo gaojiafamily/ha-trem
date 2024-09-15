@@ -39,9 +39,9 @@ save:
       selector:
         text:
 
-update_location:
-  name: Update location
-  description: Fetch DPIP client location of the entity.
+reconnect:
+  name: Reconnect Websocket connection
+  description: Reconnect the websocket connection of the entity.
   fields:
     entity_id:
       name: Entity

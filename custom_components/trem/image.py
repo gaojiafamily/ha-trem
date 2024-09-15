@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from io import BytesIO
+import json
 import logging
 import os
 import re
@@ -25,9 +27,11 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     MANUFACTURER,
+    PLAN_NAME,
     TREM_COORDINATOR,
     TREM_NAME,
 )
+from .earthquake.eew import EEW
 from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,10 +81,14 @@ class earthquakeImage(ImageEntity):
             identifiers={(DOMAIN, config_entry.entry_id)},
             name=name,
             manufacturer=MANUFACTURER,
-            model=self._coordinator.plan,
+            model=PLAN_NAME[self._coordinator.plan],
         )
 
-        self.image: BytesIO = BytesIO()
+        self._image: BytesIO = BytesIO()
+        self._mapSerial: dict = {
+            "earthquake": "",
+            "intensity": "",
+        }
         self._attributes = {}
         self._attr_value = {}
 
@@ -94,31 +102,77 @@ class earthquakeImage(ImageEntity):
     async def async_image(self) -> bytes | None:
         """Return bytes of image."""
 
-        return self.image.getvalue()
+        return self._image.getvalue()
 
     @callback
     def _update_callback(self):
         """Handle updated data from the coordinator."""
 
-        if self._coordinator.map is None:
+        eew = self._coordinator.eew
+        intensity = self._coordinator.intensity
+        image: BytesIO | None = self._draw(eew, intensity)
+
+        if image is None:
+            return
+
+        self._image = image
+        self._attr_value[ATTR_ID] = json.dumps(self._mapSerial)
+        self._attr_image_last_updated = dt_util.utcnow()
+
+        self.async_write_ha_state()
+
+    def _draw(
+        self, eew: EEW | None = None, intensity: dict | None = None
+    ) -> BytesIO | None:
+        """Draw the earthquake map."""
+
+        image: BytesIO | None = None
+
+        currentSerial = self._attr_value.get(ATTR_ID, "")
+        if currentSerial == "":
             if not self._first_draw:
+                image = BytesIO()
                 self._first_draw = True
+
                 directory = os.path.dirname(os.path.realpath(__file__))
                 image_path = os.path.join(directory, "asset/default.png")
 
                 default_img = Image.open(image_path, mode="r")
-                default_img.save(self.image, format="PNG")
-            else:
-                return
-        elif self.image == self._coordinator.map:
-            return
-        else:
-            self.image = self._coordinator.map
+                default_img.save(image, format="PNG")
+        elif isinstance(eew, EEW):
+            tmp_intensity: dict = {}
 
-        self._attr_value[ATTR_ID] = self._coordinator.mapSerial
-        self._attr_image_last_updated = dt_util.utcnow()
+            # Earthquake serial
+            tmpSerial: dict = {"earthquake": f"{eew.id} (Serial: {eew.serial})"}
 
-        self.async_write_ha_state()
+            # Intensity serial and get area intensity
+            intAuthor = intensity.get("author", False)
+            if intAuthor:
+                intDrawID = intensity.get("id", "")
+                intSerial = intensity.get("serial", "0")
+                tmpSerial["intensity"] = f"{intAuthor}-{intDrawID} (Serial {intSerial})"
+
+                intensityArea = intensity.get("area", {})
+                for k in intensityArea:
+                    for v in intensityArea[k]:
+                        tmp_intensity[v] = k  # noqa: SLF001
+
+            earthquake = eew.earthquake
+            tmp_intensity[self._region] = earthquake._expected_intensity.get(  # noqa: SLF001
+                self._region
+            )
+
+            if currentSerial != json.dumps(tmpSerial):
+                earthquake.map.draw()
+
+            waveSec = (datetime.now() - earthquake.time).total_seconds()
+            if waveSec > 0:
+                earthquake.map.draw_wave(time=waveSec)
+
+            self._mapSerial = tmpSerial
+            image = earthquake.map.save()
+
+        return image
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

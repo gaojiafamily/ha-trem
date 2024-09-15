@@ -104,7 +104,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     tremCoordinator = tremUpdateCoordinator(
         hass,
         base_info,
-        region,
         update_interval,
     )
     domain_data = {

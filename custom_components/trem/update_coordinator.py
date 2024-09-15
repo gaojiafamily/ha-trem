@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from asyncio.exceptions import TimeoutError
-from datetime import timedelta
-from io import BytesIO
+from datetime import datetime, timedelta
 import json
 import logging
 import random
-import time
 
-from aiohttp import ClientResponse, WebSocketError
 from aiohttp.client_exceptions import ClientConnectorError
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, METH_GET, USER_AGENT
 import validators
@@ -33,7 +30,8 @@ from .const import (
     REQUEST_TIMEOUT,
     SUBSCRIBE_PLAN,
 )
-from .exceptions import UnknownError, WebSocketClosure
+from .earthquake.eew import EEW
+from .exceptions import UnknownError, WebSocketClosure, WebSocketException
 from .session import WebSocketConnection
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,263 +44,262 @@ class tremUpdateCoordinator(DataUpdateCoordinator):
         self,
         hass: HomeAssistant,
         base_info: str | dict,
-        region: str | int,
         update_interval: timedelta,
     ) -> None:
         """Initialize the data object."""
 
+        # Coordinator data
         self._hass = hass
-        self._init_update_interval = update_interval
+        self.timer = update_interval
+        self.plan: str = FREE_PLAN
+        self.status: str = "http"
+        self.retry: int = 0
 
+        # Websocket data
         self.connection: WebSocketConnection | None = None
         self.session = async_get_clientsession(hass)
         self._credentials: dict | None = None
-        self.plan: str = FREE_PLAN
 
-        self.region = region
-        self.map: BytesIO | None = None
-        self.mapSerial = ""
+        # Connection data
+        self._http_url = ""
+        self._http_station = ""
+        self._ws_url = ""
+        self._ws_station = ""
 
+        # Get the route for fetching data
         if isinstance(base_info, dict):
-            station, base_url = random.choice(list(BASE_WS.items()))
             self.plan = SUBSCRIBE_PLAN
+
             self._credentials = {
-                CONF_EMAIL: base_info[CONF_EMAIL],
-                CONF_PASS: base_info[CONF_PASS],
+                CONF_EMAIL: base_info.get(CONF_EMAIL, ""),
+                CONF_PASS: base_info.get(CONF_PASS, ""),
             }
+
+            self.get_route()
         elif base_info in BASE_URLS:
-            station = base_info
-            base_url = BASE_URLS[base_info]
+            self._http_station = base_info
+            self._http_url = f"{BASE_URLS[base_info]}/api/v1/eq/eew"
         elif validators.url(base_info):
-            station = base_info
-            base_url = base_info
             self.plan = CUSTOMIZE_PLAN
+
+            self._http_station = base_info
+            self._http_url = base_info
         else:
-            station, base_url = random.choice(list(BASE_URLS.items()))
-        self.station: str = station
-        self._tmpStation: str | None = None
-        self._tmpUrl: str | None = None
-        self._base_url: str = (
-            f"{base_url}/api/v1/eq/eew?type=cwa" if self.plan == FREE_PLAN else base_url
+            self.get_route()
+
+        # Connection status
+        self.station = (
+            self._ws_station if self.plan == SUBSCRIBE_PLAN else self._http_station
         )
+        self.recvTime: float = datetime.timestamp(datetime.now()) * 1000
 
-        self.start = time.time()
-        self.timeOffset: float | None = None
-        self.protocol = "Http(s)"
-        self.retry: int = 0
-
+        # Sensor data
         self.earthquakeData: list = []
         self.intensity: dict = {}
         self.rtsData: dict = {}
         self.tsunamiData: dict = {}
 
-        if self.plan == SUBSCRIBE_PLAN:
-            self.protocol = "Websocket"
-            super().__init__(
-                hass,
-                _LOGGER,
-                name=self.protocol,
-                update_method=self._async_update_websocket,
-                update_interval=self._init_update_interval,
-            )
-        else:
-            super().__init__(
-                hass,
-                _LOGGER,
-                name=self.protocol,
-                update_method=self._async_update_http,
-                update_interval=self._init_update_interval,
-            )
+        # Earthquake data
+        self.eew: EEW | None = None
 
-        _LOGGER.debug(
-            f"{self.protocol}: Fetching data from {self.station}, EEW(location: {self.region}) is monitoring..."  # noqa: G004
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="TREM",
+            update_interval=self.timer,
         )
 
-    async def _fetch_data(self, url=None) -> ClientResponse:
-        """Fetch earthquake data from the Http API."""
-
-        self.protocol = "Http(s)"
-        self.start = time.time()
-
-        payload = {}
-        headers = {
-            ACCEPT: CONTENT_TYPE_JSON,
-            CONTENT_TYPE: CONTENT_TYPE_JSON,
-            USER_AGENT: HA_USER_AGENT,
-        }
-
-        resp = await self.session.request(
-            method=METH_GET,
-            url=self._base_url if url is None else url,
-            data=json.dumps(payload),
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-        )
-
-        self.timeOffset = time.time() - self.start
-        return resp
-
-    async def _async_update_http(self):
-        """Poll earthquake data from Http(s) api."""
+    async def _async_update_data(self):
+        """Poll earthquake data."""
 
         if self.retry >= 5:
             self.update_interval = timedelta(seconds=86400)
             raise UpdateFailed
 
-        try:
-            response = await self._fetch_data()
-        except ClientConnectorError as ex:
-            self.retry = self.retry + 1
-
-            _LOGGER.error(
-                f"Failed fetching data from Http(s) API({self.station}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
-            )
-        except TimeoutError as ex:
-            self.retry = self.retry + 1
-
-            _LOGGER.error(
-                f"Failed fetching data from Http(s) API({self.station}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
-            )
-        except Exception:
-            _LOGGER.exception(
-                f"An unexpected exception occurred fetching the data from Http(s) API({self.station})."  # noqa: G004
-            )
-        else:
-            if response.ok:
-                self.retry = 0
-
-                self.earthquakeData = await response.json()
-            else:
-                self.retry = self.retry + 1
-
-                _LOGGER.error(
-                    f"Failed fetching data from Http(s) API({self.station}), (HTTP Status Code = {response.status}). Retry {self.retry}/5..."  # noqa: G004
-                )
-
-        if self.retry == 0:
-            self.update_interval = self._init_update_interval
-
-        if self.retry > 0:
-            self.update_interval = timedelta(seconds=60)
-
-            station, base_url = await self.get_route()
-            self.station = station
-            self._base_url = base_url
-            _LOGGER.warning(
-                f"Switch Station {self.station} to {station}, Try to fetching data..."
-            )
-
-            raise UpdateFailed
-
-        return self
-
-    async def _async_update_websocket(self):
-        """Poll earthquake data from websocket."""
-
-        if self.connection is None:
+        resp: dict = {}
+        if self.plan == SUBSCRIBE_PLAN:
             try:
-                self.connection = WebSocketConnection(
-                    self._hass, self._base_url, self._credentials
-                )
-                self._hass.async_create_task(self.connection.connect())
+                if self.connection is None:
+                    self.connection = WebSocketConnection(
+                        self._hass, self._ws_url, self._credentials
+                    )
+                    self._hass.async_create_task(self.connection.connect())
 
+                if self.connection.is_running:
+                    self.retry = 0
+                    resp = await self.connection.recv()
+
+                    recvData: dict | bool = resp.get("data", False)
+                    if recvData:
+                        self.recvTime = recvData.get(
+                            "time", datetime.timestamp(datetime.now()) * 1000
+                        )
+
+                        subscrib_service: list = resp.get("list", [])
+                        if len(subscrib_service) > 0:
+                            self.earthquakeData = self.connection.earthquakeData
+                            self.intensity = self.connection.intensity
+                            self.rtsData = self.connection.rtsData
+                            self.tsunamiData = self.connection.tsunamiData
+
+                            self.status = SUBSCRIBE_PLAN
+                        else:
+                            await _notify_message(
+                                self._hass,
+                                "MembershipExpired",
+                                CLIENT_NAME,
+                                "Your VIP membership has expired, Please re-subscribe.",
+                            )
+
+                            self.status = FREE_PLAN
+                    else:
+                        resp = {}
+                        self.status = "ws_reconnect"
+                        self.recvTime = datetime.timestamp(datetime.now()) * 1000
+                else:
+                    self.retry = self.retry + 1
+
+                    self.connection = None
+                    resp = {}
+                    self.status = "ws_reconnect"
+                    _LOGGER.warning("Reconnecting websocket")
+
+            except ConnectionResetError:
+                await self.connection.close()
+                self.status = "failure"
+
+                _LOGGER.error("The websocket server has closed the connection")
             except WebSocketClosure:
-                _LOGGER.error("The websocket server has closed the connection.")
+                self.connection = None
+                self.status = "ws_reconnect"
 
-            except WebSocketError:
-                _LOGGER.error("Websocket connection had an error.")
-
+                _LOGGER.error("The websocket server has closed the connection")
+            except WebSocketException:
+                _LOGGER.error("Websocket connection had an error")
             except UnknownError:
-                _LOGGER.error("An unexpected error occurred.")
-
+                _LOGGER.error("An unexpected error occurred")
+            except TimeoutError:
+                _LOGGER.error("Unable to login to account")
+            except TypeError:
+                if not self.connection.is_stopping:
+                    _LOGGER.error("Received non-JSON data from server")
+            except (KeyboardInterrupt, SystemExit):
+                await self.connection.close()
             except Exception:
                 _LOGGER.exception(
-                    "An unexpected exception occurred on the websocket client."
+                    "An unexpected exception occurred on the websocket client"
                 )
-        else:
-            isReady = self.connection.ready()
-            if isReady:
-                self.retry = 0
-                self.protocol = "Websocket"
 
-                self.earthquakeData = self.connection.earthquakeData
-                self.intensity = self.connection.intensity
-                self.rtsData = self.connection.rtsData
-                self.tsunamiData = self.connection.tsunamiData
+        if not resp.get("data", False):
+            try:
+                payload = {}
+                headers = {
+                    ACCEPT: CONTENT_TYPE_JSON,
+                    CONTENT_TYPE: CONTENT_TYPE_JSON,
+                    USER_AGENT: HA_USER_AGENT,
+                }
 
-                if len(self.connection.subscrib_service) == 0:
-                    await _notify_message(
-                        self._hass,
-                        "MembershipExpired",
-                        CLIENT_NAME,
-                        "Your VIP membership has expired, Please re-subscribe.",
-                    )
-                    return self
-
-                self.timeOffset = time.time() - self.connection.start
-            else:
+                response = await self.session.request(
+                    method=METH_GET,
+                    url=self._http_url,
+                    data=json.dumps(payload),
+                    headers=headers,
+                    timeout=REQUEST_TIMEOUT,
+                )
+                self.recvTime = datetime.timestamp(datetime.now()) * 1000
+            except ClientConnectorError as ex:
                 self.retry = self.retry + 1
 
-                if not self.connection.is_running:
-                    self.connection = None
-                    _LOGGER.warning("Reconnecting websocket...")
-
-        if self.retry == 0:
-            self.update_interval = self._init_update_interval
-
-        if self.retry > 0:
-            self.update_interval = timedelta(seconds=5)
-
-            if self._tmpUrl is None:
-                station, url = await self.get_route("Http(s)")
-                self._tmpStation = station
-                self._tmpUrl = f"{url}/api/v1/eq/eew?type=cwa"
-
-            try:
-                _LOGGER.warning(
-                    f"Websocket is unavailable, Fetching data from Http(s) API({self._tmpStation})..."  # noqa: G004
-                )
-                response = await self._fetch_data(self._tmpUrl)
-            except ClientConnectorError as ex:
                 _LOGGER.error(
-                    f"Failed fetching data from Http(s) API({self._tmpStation}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
+                    "Failed fetching data from HTTP API(%s), %s. Retry %s/5",
+                    self.station,
+                    ex.strerror,
+                    self.retry,
                 )
             except TimeoutError as ex:
+                self.retry = self.retry + 1
+
                 _LOGGER.error(
-                    f"Failed fetching data from Http(s) API({self._tmpStation}), {ex.strerror}. Retry {self.retry}/5..."  # noqa: G004
+                    "Failed fetching data from HTTP API(%s), %s. Retry %s/5",
+                    self.station,
+                    ex.strerror,
+                    self.retry,
                 )
             except Exception:
                 _LOGGER.exception(
-                    f"An unexpected exception occurred fetching the data from Http(s) API({self._tmpStation})."  # noqa: G004
+                    "An unexpected exception occurred fetching the data from HTTP API(%s)",
+                    self.station,
                 )
             else:
                 if response.ok:
-                    self.earthquakeData = await response.json()
-                    return self
+                    self.retry = 0
 
-                _LOGGER.error(
-                    f"Failed fetching data from Http(s) API({self._tmpStation}), (HTTP Status Code = {response.status}). Retry {self.retry}/5..."  # noqa: G004
-                )
+                    resp = await response.json()
+                    self.earthquakeData = resp
+                else:
+                    self.retry = self.retry + 1
 
-            self._tmpUrl = None
+                    _LOGGER.error(
+                        "Failed fetching data from HTTP API(%s), (HTTP Status Code = %s). Retry %s/5",
+                        self.station,
+                        response.status,
+                        self.retry,
+                    )
+
+        if _LOGGER.isEnabledFor(logging.DEBUG):
+            _LOGGER.info("Recv: %s", resp)
+
+        if self.retry == 0:
+            self.update_interval = self.timer
+
+        if self.retry > 0:
+            self.update_interval = timedelta(
+                seconds=5 if self.plan == SUBSCRIBE_PLAN else 60
+            )
+
+            # Switch route
+            self.get_route(
+                {
+                    FREE_PLAN: self._http_station,
+                    SUBSCRIBE_PLAN: self._ws_station,
+                }
+            )
+
             raise UpdateFailed
 
         return self
 
-    async def get_route(self, protocol="Websocket"):
+    def get_route(self, exclude: dict | None = None):
         """Random the node for fetching data."""
 
+        # Self server
         if self.plan == CUSTOMIZE_PLAN:
             return None
 
-        tmpStations = BASE_URLS.items()
-        if self.plan == SUBSCRIBE_PLAN and protocol == "Websocket":
-            tmpStations = BASE_WS.items()
-        tmpStations = {
-            k: v for k, v in tmpStations if k != self.station
-        }  # tmpStations.pop(self.station)
+        # HTTP route
+        if isinstance(exclude, dict) and exclude.get(FREE_PLAN):
+            HTTP_Route = {k: v for k, v in BASE_URLS.items() if k != exclude[FREE_PLAN]}
+        else:
+            HTTP_Route = BASE_URLS.items()
+        self._http_station, base_url = random.choice(list(HTTP_Route))
+        self._http_url = f"{base_url}/api/v1/eq/eew"
 
-        return random.choice(list(tmpStations.items()))
+        # Websocket route
+        if isinstance(exclude, dict) and exclude.get(SUBSCRIBE_PLAN):
+            WS_Route = {
+                k: v for k, v in BASE_WS.items() if k != exclude[SUBSCRIBE_PLAN]
+            }
+        else:
+            WS_Route = BASE_WS.items()
+        self._ws_station, base_url = random.choice(list(WS_Route))
+        self._ws_url = base_url
+
+        if isinstance(exclude, dict) and exclude.get(self.plan, False):
+            _LOGGER.warning(
+                "Switch Station {%s} to {%s}, Try to fetching data",
+                exclude[self.plan],
+                self._ws_station if self.plan == SUBSCRIBE_PLAN else self._http_station,
+            )
 
 
 async def _notify_message(

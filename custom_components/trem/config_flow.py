@@ -127,7 +127,7 @@ async def validate_input(
             if response.status != HTTPStatus.OK:
                 raise AccountInvalid
         except (ClientConnectorError, TimeoutError) as ex:
-            _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
+            _LOGGER.error("Unable to login to account, server error. %s", ex)
         else:
             return region_name if return_region else True
 
@@ -158,7 +158,9 @@ async def validate_input(
                     raise CannotConnect
             except ClientConnectorError as ex:
                 _LOGGER.error(
-                    f"Failed fetching data from HTTP API({uri}), {ex.strerror}."  # noqa: G004
+                    "Failed fetching data from HTTP API(%s), %s",
+                    uri,
+                    ex.strerror,
                 )
             else:
                 return region_name if return_region else True

@@ -15,8 +15,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_platform import async_get_platforms
 
-from .const import ATTR_EQDATA, ATTR_FILENAME, DOMAIN
+from .const import ATTR_EQDATA, ATTR_FILENAME, DOMAIN, TREM_COORDINATOR
 from .sensor import earthquakeSensor
+from .update_coordinator import tremUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,8 +88,35 @@ def register_services(hass: HomeAssistant) -> None:
                 f"Could not find entity {entity_id} from integration {DOMAIN}"
             )
 
-        _LOGGER.debug("Starting simulator earthquake.")
+        _LOGGER.debug("Starting simulator earthquake")
         entity.simulator = json.loads(eartkquakeData)
+
+    async def reconnect(service_call: ServiceCall) -> None:
+        """Reconnect the service."""
+
+        entity_id: str | None = service_call.data[ATTR_ENTITY_ID]
+
+        platforms = async_get_platforms(hass, DOMAIN)
+        if len(platforms) < 1:
+            raise HomeAssistantError(f"Integration not found: {DOMAIN}")
+
+        entry_id: str | None = None
+        for platform in platforms:
+            entity_tmp = platform.entities.get(entity_id, None)
+            if entity_tmp is not None:
+                entry_id = platform.config_entry.entry_id
+                break
+        if entry_id is None:
+            raise HomeAssistantError(
+                f"Could not find entity {entity_id} from integration {DOMAIN}"
+            )
+
+        domain_data: dict = hass.data[DOMAIN][entry_id]
+        coordinator: tremUpdateCoordinator = domain_data[TREM_COORDINATOR]
+
+        coordinator.retry = 0
+        coordinator.connection = None
+        coordinator.update_interval = coordinator.timer
 
     hass.services.async_register(
         DOMAIN,
@@ -110,6 +138,17 @@ def register_services(hass: HomeAssistant) -> None:
             {
                 vol.Required(ATTR_ENTITY_ID): cv.entity_id,
                 vol.Required(ATTR_FILENAME): cv.string,
+            }
+        ),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "reconnect",
+        reconnect,
+        vol.Schema(
+            {
+                vol.Required(ATTR_ENTITY_ID): cv.entity_id,
             }
         ),
     )

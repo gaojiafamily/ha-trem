@@ -25,3 +25,7 @@ class UnknownError(exceptions.HomeAssistantError):
 
 class WebSocketClosure(exceptions.HomeAssistantError):
     """Represents a websocket closed signal."""
+
+
+class WebSocketException(exceptions.HomeAssistantError):
+    """Represents a websocket closed signal."""

@@ -6,9 +6,8 @@ import asyncio
 from enum import Enum
 import json
 import logging
-import time
 
-from aiohttp import ClientWebSocketResponse, WebSocketError, WSMsgType
+from aiohttp import ClientWebSocketResponse, WSMsgType
 from aiohttp.client_exceptions import (
     ClientConnectorError,
     ServerTimeoutError,
@@ -35,7 +34,12 @@ from .const import (
     REQUEST_TIMEOUT,
     __version__,
 )
-from .exceptions import CannotConnect, UnknownError, WebSocketClosure
+from .exceptions import (
+    CannotConnect,
+    UnknownError,
+    WebSocketClosure,
+    WebSocketException,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,21 +77,20 @@ class WebSocketConnection:
     """A Websocket connection to a TREM service."""
 
     def __init__(self, hass: HomeAssistant, url: str, credentials: list) -> None:
-        """Initialize the connection."""
+        """Initialize the websocket."""
 
         self._hass = hass
 
         self._connection: ClientWebSocketResponse | None = None
         self._session = async_get_clientsession(hass)
         self.is_running = False
-        self._is_stopping = False
+        self.is_stopping = False
 
         self._url = url
         self._credentials = credentials
         self._access_token: str = "c0d30WNER$JTGAO"
-        self._is_verify: bool = False
 
-        self.subscrib_service: list = []
+        self._subscrib_service: list = []
         self._register_service: list[WebSocketService] = [
             WebSocketService.EEW.value,
             WebSocketService.TSUNAMI.value,
@@ -100,10 +103,8 @@ class WebSocketConnection:
         self.rtsData: dict = {}
         self.tsunamiData: dict = {}
 
-        self.start = time.time()
-
     async def connect(self):
-        """Connect to TREM websocket..."""
+        """Connect to Websocket..."""
 
         self.is_running = True
 
@@ -120,7 +121,7 @@ class WebSocketConnection:
                 max_msg_size=DEFAULT_MAX_MSG_SIZE,
             )
         except WSServerHandshakeError:
-            raise WebSocketError  # noqa: B904
+            raise WebSocketException  # noqa: B904
         except Exception:  # noqa: BLE001
             raise CannotConnect  # noqa: B904
 
@@ -131,7 +132,6 @@ class WebSocketConnection:
             self._hass.bus.async_listen_once(
                 EVENT_HOMEASSISTANT_STOP, _async_stop_handler
             )
-            await asyncio.gather(*[self._recv()])
         except Exception:  # noqa: BLE001
             await self.close()
             raise UnknownError  # noqa: B904
@@ -140,92 +140,78 @@ class WebSocketConnection:
         """Close connection."""
 
         self.is_running = False
-        self._is_stopping = True
+        self.is_stopping = True
         if self._connection is not None:
             await self._connection.close()
 
-    async def _disconnected(self):
-        if not self._is_stopping:
-            asyncio.gather(*[self.connect()])
+    async def recv(self) -> dict:
+        """Recive websocket data."""
 
-    async def _recv(self):
-        while self.connected:
-            try:
-                self.start = time.time()
-                msg = await self._connection.receive()
-                if msg:
-                    msg_data: dict = json.loads(msg.data)
-                    msg_type: WSMsgType = msg.type
-                else:
-                    continue
+        if self._connection is None:
+            return {}
 
-                if msg_type in (
-                    WSMsgType.CLOSE,
-                    WSMsgType.CLOSED,
-                    WSMsgType.CLOSING,
-                ):
-                    raise WebSocketClosure
+        msg = await self._connection.receive()
+        if msg:
+            msg_type: WSMsgType = msg.type
+        else:
+            return {}
 
-                if msg_type == WSMsgType.ERROR:
-                    handle_error = await self._handle_error(msg_data)
-                    if not handle_error:
-                        raise WebSocketError
+        if msg_type in (
+            WSMsgType.CLOSE,
+            WSMsgType.CLOSED,
+            WSMsgType.CLOSING,
+        ):
+            raise WebSocketClosure
 
-                data_type = msg_data.get("type")
-                if data_type == WebSocketEvent.VERIFY.value:
-                    self._access_token = await self._fetchToken(
-                        credentials=self._credentials
-                    )
-                    payload: dict = {
-                        "key": self._access_token,
-                        "service": self._register_service,
-                    }
-                    payload["type"] = "start"
-                    await self._connection.send_json(payload)
+        msg_data: dict = json.loads(msg.data)
 
-                    data = await asyncio.wait_for(self.wait_for_verify(), timeout=60)
-                    self.subscrib_service = data["list"]
-                elif data_type == "data":
-                    data: dict = msg_data.get("data")
-                    eventType: dict = data.get("type")
+        if msg_type == WSMsgType.ERROR:
+            handle_error = await self._handle_error(msg_data)
+            if not handle_error:
+                raise WebSocketException
 
-                    if eventType == WebSocketEvent.RTS.value:
-                        self.rtsData = data.get("data")
-                    elif _LOGGER.isEnabledFor(logging.DEBUG):
-                        _LOGGER.info("recv: %s", msg_data)
+        data_type = msg_data.get("type")
+        if data_type == WebSocketEvent.VERIFY.value:
+            self._access_token = await self._fetchToken(credentials=self._credentials)
+            payload: dict = {
+                "key": self._access_token,
+                "service": self._register_service,
+            }
+            payload["type"] = "start"
+            await self._connection.send_json(payload)
 
-                    if eventType == WebSocketEvent.INTENSITY.value:
-                        self.intensity = data
+            data: dict = await asyncio.wait_for(self._wait_for_verify(), timeout=60)
+            self._subscrib_service = data.get("list", [])
+        elif data_type == "data":
+            data: dict = msg_data.get("data")
+            eventType: dict = data.get("type")
 
-                    if eventType == WebSocketEvent.EEW.value:
-                        if data.get("author", None) == "cwa":
-                            msgTime = msg_data.get("time", 0)
-                            tmpData: dict = data
-                            tmpData["time"] = data.get("time", msgTime)
-                            self.earthquakeData = [tmpData]
+            if eventType == WebSocketEvent.RTS.value:
+                self.rtsData = data.get("data")
 
-                    if eventType == WebSocketEvent.TSUNAMI.value:
-                        if data.get("author", None) == "cwa":
-                            msgTime = msg_data.get("time", 0)
-                            tmpData: dict = data
-                            tmpData["time"] = data.get("time", msgTime)
-                            self.tsunamiData = tmpData
-            except ConnectionResetError:
-                await self.close()
-                raise WebSocketClosure  # noqa: B904
-            except TimeoutError as ex:
-                _LOGGER.error(f"Unable to login to account, server error. {ex}")  # noqa: G004
-                break
-            except (KeyboardInterrupt, SystemExit):
-                await self.close()
-            except TypeError:
-                if not self._is_stopping:
-                    _LOGGER.error("Received non-JSON data from server.")
-                break
+            if eventType == WebSocketEvent.INTENSITY.value:
+                self.intensity = data
 
-        await self._disconnected()
+            if eventType == WebSocketEvent.EEW.value:
+                if data.get("author", None) == "cwa":
+                    msgTime = msg_data.get("time", 0)
+                    tmpData: dict = data
+                    tmpData["time"] = data.get("time", msgTime)
+                    self.earthquakeData = [tmpData]
 
-    async def wait_for_verify(self):
+            if eventType == WebSocketEvent.TSUNAMI.value:
+                if data.get("author", None) == "cwa":
+                    msgTime = msg_data.get("time", 0)
+                    tmpData: dict = data
+                    tmpData["time"] = data.get("time", msgTime)
+                    self.tsunamiData = tmpData
+
+        return {
+            "list": self._subscrib_service,
+            "data": msg_data,
+        }
+
+    async def _wait_for_verify(self):
         """Return websocket message data if verify successfully."""
 
         while True:
@@ -242,30 +228,19 @@ class WebSocketConnection:
             data: dict = msg_data.get("data")
             data_code = data.get("code")
             if data_code == 200:
-                self._is_verify = True
                 return data
 
-            self._is_verify = False
             await self._handle_error(msg_data)
 
-    def connected(self) -> bool:
+    def _connected(self) -> bool:
         """Whether the websocket is connected."""
 
         if self._connection is None:
             return False
-        if self._is_stopping or self._connection.closed:
+        if self.is_stopping or self._connection.closed:
             return False
 
         return True
-
-    def ready(self) -> bool:
-        """Whether the websocket is ready."""
-
-        offline = not self.connected()
-        if offline:
-            return False
-
-        return self._is_verify
 
     async def _fetchToken(self, credentials: list) -> str:
         """Fetch token from Exptech Membership."""
@@ -291,9 +266,9 @@ class WebSocketConnection:
                 if not response.ok:
                     message = response.json()
                     _LOGGER.error(
-                        f"""
-                        Failed fetching token from Exptech Membership API, \n
-                        {message['message']} (HTTP Status Code = {response.status})."""  # noqa: G004
+                        "Failed fetching token from Exptech Membership API, %s (HTTP Status Code = %s)",
+                        message["message"],
+                        response.status,
                     )
                 else:
                     token = await response.text()
@@ -302,15 +277,15 @@ class WebSocketConnection:
                     return token
             except ClientConnectorError as ex:
                 _LOGGER.error(
-                    f"Failed fetching token from Exptech Membership API, {ex.strerror}."  # noqa: G004
+                    "Failed fetching token from Exptech Membership API, %s", ex.strerror
                 )
             except TooManyRedirects:
                 _LOGGER.error(
-                    "Failed fetching token from Exptech Membership API, Too many redirects."
+                    "Failed fetching token from Exptech Membership API, Too many redirects"
                 )
             except ServerTimeoutError:
                 _LOGGER.error(
-                    "Failed fetching token from Exptech Membership API, Time out."
+                    "Failed fetching token from Exptech Membership API, Timeout"
                 )
         else:
             return self._access_token
@@ -325,17 +300,17 @@ class WebSocketConnection:
 
         if status_code == 400:
             message = (
-                "The number of available authorization has reached the upper limit."
+                "The number of available authorization has reached the upper limit"
             )
 
         if status_code == 401:
-            message = "The account does not exist or password is invalid."
+            message = "The account does not exist or password is invalid"
 
         if status_code == 403:
-            message = "Your VIP membership has expired, Please re-subscribe."
+            message = "Your VIP membership has expired, Please re-subscribe"
 
         if status_code == 429:
-            message = "Too many requests in a given time."
+            message = "Too many requests in a given time"
 
         if message is None:
             return False

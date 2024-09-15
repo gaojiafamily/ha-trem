@@ -18,7 +18,7 @@ ISSUE_URL = f"{PROJECT_URL}issues"
 MIN_HA_MAJ_VER = 2024
 MIN_HA_MIN_VER = 3
 __min_ha_version__ = f"{MIN_HA_MAJ_VER}.{MIN_HA_MIN_VER}.0"
-__version__ = "1.3.6"
+__version__ = "1.5.0"
 
 # Earthquake Icon
 EARTHQUAKE_ICON = {
@@ -86,16 +86,10 @@ WEBSOCKET_COORDINATOR_UPDATE_INTERVAL = timedelta(seconds=1)
 # REST
 HA_USER_AGENT = "TREM custom integration for Home Assistant (https://github.com/gaojiafamily/ha-trem)"
 BASE_URLS = {
-    "tainan_cache_limit": "https://api-1.exptech.com.tw",
     "tainan_cache": "https://api-1.exptech.dev",
-    "taipe_cache_limit": "https://api-2.exptech.com.tw",
-    "taipe_cache": "https://api-2.exptech.dev",
-    "taipei_limit": "https://lb-1.exptech.com.tw",
+    "taipei_cache": "https://api-2.exptech.dev",
     "taipei": "https://lb-1.exptech.dev",
-    "pingtung_limit": "https://lb-2.exptech.com.tw",
     "pingtung": "https://lb-2.exptech.dev",
-    "taipei_2": "https://lb-3.exptech.com.tw",
-    "pingtung_2": "https://lb-4.exptech.com.tw",
 }
 LOGIN_URL = "https://api-1.exptech.dev/api/v3/et/login"
 NOTIFY_URL = "https://api-1.exptech.dev/api/v1/notify"
@@ -111,9 +105,21 @@ BASE_WS = {
 DEFAULT_MAX_MSG_SIZE = 16 * 1024 * 1024
 
 # STRINGS
-CUSTOMIZE_PLAN = "Customize (Free Plan)"
-FREE_PLAN = "Http(s) API (Free Plan)"
-SUBSCRIBE_PLAN = "Websocket (Subscribe Plan)"
+CUSTOMIZE_PLAN = "cust"
+FREE_PLAN = "http"
+SUBSCRIBE_PLAN = "ws"
+PLAN_NAME = {
+    "cust": "Customize",
+    "http": "HTTP API (Free Plan)",
+    "ws": "Websocket (Subscribe Plan)",
+}
+
+CONNECTION_MSG = {
+    "http": "HTTP",
+    "ws": "Websocket",
+    "ws_reconnect": "HTTP (WS Reconnect...)",
+    "failure": "Network failure",
+}
 
 WS_MSG_TOO_BIG = (
     f"Please consider increasing message size with `{DEFAULT_MAX_MSG_SIZE}`."
