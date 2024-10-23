@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 import json
 import logging
 import random
-import time
 
 from aiohttp.client_exceptions import ClientConnectorError
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, METH_GET, USER_AGENT
