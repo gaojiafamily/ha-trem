@@ -165,8 +165,9 @@ class earthquakeImage(ImageEntity):
             if currentSerial != json.dumps(tmpSerial):
                 earthquake.map.draw()
 
+            waveDraw = earthquake.time + (600 * 1000) > datetime.now()
             waveSec = (datetime.now() - earthquake.time).total_seconds()
-            if waveSec > 0:
+            if waveDraw and waveSec > 0:
                 earthquake.map.draw_wave(time=waveSec)
 
             self._mapSerial = tmpSerial
