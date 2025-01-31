@@ -17,6 +17,25 @@
 [English](README.md) | 繁體中文<br>
 
 
+## 停止維護
+
+<p>此專案已停止維護</p>
+
+感謝您使用與支持[ha-trem]，<br/>
+由於技術障礙因素，我們已不再維護。<br/>
+
+這代表:<br/>
+- 不再有新功能.
+- 不再接受 PR 與 ISSUE.
+- 不再發布新版本.
+
+<p>如果您想接手維護此專案，請聯絡我們。</p>
+
+## 代替方案
+
+目前社群上仍有活耀的可用方案，請參考:
+- [hassio-addon-oxwu](https://github.com/tsunglung/hassio-addon-oxwu)
+
 ## 預覽
 
 ![config_flow_image](https://github.com/user-attachments/assets/9d92c830-7318-4baf-add7-a07d1e2d2673)
