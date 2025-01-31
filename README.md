@@ -17,6 +17,27 @@
 English | [繁體中文](README_zhHant.md)<br>
 
 
+## Important Announcement
+
+<p>This project is no longer maintained.</p>
+
+Thank you for your interest in and support of [ha-trem].<br/>
+We regret to inform you that, due to technical obstacles,<br/>
+this project is now unmaintained.<br/>
+
+What this means:<br/>
+- We will no longer actively develop new features.
+- We will not address issues or pull requests.
+- We will not release new versions.
+
+<p>If you are interested in taking over the maintenance of this project, please feel free to contact us.</p>
+
+## Alternatives
+
+If you need a project with similar functionality, please consider the following alternatives:
+- [hassio-addon-oxwu](https://github.com/tsunglung/hassio-addon-oxwu)
+
+
 ## Screenshots
 
 ![config_flow_image](https://github.com/user-attachments/assets/9d92c830-7318-4baf-add7-a07d1e2d2673)
